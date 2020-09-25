@@ -548,4 +548,27 @@ public:
                      CSolver** solver_container,
                      CConfig* config) override;
 
+  void Compute_ViscCD_StokesMethod(CGeometry *geometry,
+		  	  	  	  	  	  	   CConfig *config);
+
+  void Fit_exponential(su2double ***wm_plus,
+		               su2double ***y_plus,
+					   su2double ***x_pos,
+					   unsigned long nPoin_x,
+					   unsigned long nPoin_y,
+					   unsigned long nPoin_z,
+					   su2double **Wm_plus,
+					   su2double **x_at_wall);
+
+  void Find_peaks_and_throughs(su2double **data,
+		  	  	  	  	  	  	  su2double **x_at_wall,
+  		                          unsigned long nPoin_x,
+								  unsigned long nPoin_z,
+  								  su2double delta,
+  								  su2double **peaks,
+								  su2double **x_loc_peaks,
+								  su2double **amplitude_peaks);
+
 };
+
+

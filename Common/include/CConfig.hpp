@@ -1141,6 +1141,10 @@ private:
   unsigned short Kind_Inlet_InterpolationType;    /*!brief type of spanwise interpolation data to use for the inlet face. */
   bool PrintInlet_InterpolatedData;               /*!brief option for printing the interpolated data file. */
 
+  unsigned long *nPoin_samplingLines;
+  unsigned long ***samplingLines;
+  bool stokesLayerMethod;
+
   /*!
    * \brief Set the default values of config options not set in the config file using another config object.
    * \param config - Config object to use the default values from.
@@ -9379,5 +9383,17 @@ public:
    * \return -1 if (on this mpi rank) the zone defined by config is not part of the interface.
    */
   short FindInterfaceMarker(unsigned short iInterface) const;
+
+  void Set_nPoin_samplingLines(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z);
+
+  unsigned long Get_nPoinx_samplingLines(void){ return nPoin_samplingLines[0]; };
+  unsigned long Get_nPoiny_samplingLines(void){ return nPoin_samplingLines[1]; };
+  unsigned long Get_nPoinz_samplingLines(void){ return nPoin_samplingLines[2]; };
+
+  void Initialize_samplingLines(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z);
+  void Set_samplingLines(unsigned long xx, unsigned long yy, unsigned long zz, unsigned long val);
+  unsigned long Get_samplingLines(unsigned long xx, unsigned long yy, unsigned long zz){ return samplingLines[xx][yy][zz]; };
+  void Set_boolsamplingLines(void) { stokesLayerMethod = true; }
+  bool Get_boolsamplingLines(void) { return stokesLayerMethod; }
 
 };

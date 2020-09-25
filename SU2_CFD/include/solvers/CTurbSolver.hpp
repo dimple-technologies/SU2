@@ -287,6 +287,9 @@ public:
                    int val_iter,
                    bool val_update_geo) final;
 
+  void ReadSamplingLines(CGeometry *geometry,
+		                 CConfig *config);
+
  /*!
   * \brief Get the outer state for fluid interface nodes.
   * \param[in] val_marker - marker index

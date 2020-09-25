@@ -1095,3 +1095,90 @@ void CTurbSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *
   SU2_OMP_BARRIER
 
 }
+
+
+void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
+
+  /*--- Initialize discrepancyTerm from external input file ---*/
+  string text_line;
+  ifstream input_file;
+  string input_filename = "indexStokes.dat";
+
+  unsigned long nPointLocal, nPointGlobal;
+  unsigned long iPoin, jPoin, kPoin, local_index;
+  unsigned short nPoin_x, nPoin_y, nPoin_z;
+
+  nPointLocal = nPointDomain;
+#ifdef HAVE_MPI
+  SU2_MPI::Allreduce(&nPointLocal, &nPointGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+#else
+  nPointGlobal = nPointLocal; //Total number of points in the domain (no halo nodes considered)
+#endif
+
+  input_file.open(input_filename.data(), ios::in);
+  unsigned long ii=0;
+  if (input_file.fail()) {
+	  if (rank == MASTER_NODE)
+		  cout << "WARNING: There is no input file " << input_filename.data() << ". THIS MESSAGE SHOULD BE CONVERTED INTO AN ERROR!"<< endl;
+  }
+  else{
+    /*--- Read head of the file for allocation ---*/
+    getline (input_file, text_line);
+    istringstream point_line(text_line);
+    point_line >> nPoin_x >> nPoin_y >> nPoin_z;
+
+    /*--- Set the value of nPoin_x, nPoin_y, nPoin_z ---*/
+    config->Set_nPoin_samplingLines(nPoin_x, nPoin_y, nPoin_z);
+
+    /*--- Initialize the matrix samplingLines ---*/
+    config->Initialize_samplingLines(nPoin_x, nPoin_y, nPoin_z);
+
+    unsigned long xx, yy, zz;
+	unsigned long global_index;
+	zz = 0;
+
+	/*--- Read Global Indexes from file ---*/
+    while (getline (input_file, text_line)){
+		istringstream point_line(text_line);
+		if (text_line[0] == 'z'){ /* if the line starts with z=..., then it's just a header -> skip it */
+			++zz;
+			xx = 0;
+		}
+		else{
+			yy = 0;
+			while(point_line >> global_index){
+				// cout << xx << " " << yy << " " << zz << " " << global_index << endl; /* uncomment if need to debug */
+				/* --- Populate the matrix samplingLines with local index for each core ---*/
+				local_index = geometry->GetGlobal_to_Local_Point(global_index);
+				if (local_index < nPointDomain){
+					config->Set_samplingLines(xx,yy,zz,local_index);
+				}
+				else{
+					/*--- if the global_index cannot be mapped to a local index of this core,
+					than set it to an index that no point would have, e.g. nPointGlobal+1
+					(NB. 0 is a valid local index) ---*/
+					config->Set_samplingLines(xx,yy,zz,nPointGlobal+1);
+				}
+				++yy;
+			}
+			++xx;
+		}
+	}
+  }
+  input_file.close();
+  config->Set_boolsamplingLines(); /* Set boolean to true */
+  cout << "indexStokes.dat read." << endl;
+
+//  /* Uncomment if need to debug */
+//  if (rank == MASTER_NODE){
+//	  for (iPoin=0; iPoin < config->Get_nPoinx_samplingLines(); iPoin++){
+//		  for (jPoin=0; jPoin < config->Get_nPoiny_samplingLines(); jPoin++){
+//			  unsigned long ii = config->Get_samplingLines(iPoin,jPoin,0);
+//			  if (ii == nPointGlobal+1){ cout << 0 << " "; }
+//			  else{cout << geometry->nodes->GetGlobalIndex(ii) << " ";}
+//		  }
+//		  cout << endl;
+//	  }
+//  }
+
+}

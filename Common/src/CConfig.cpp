@@ -9595,3 +9595,30 @@ void CConfig::SetMultizone(CConfig *driver_config, CConfig **config_container){
   Multizone_Residual = true;
 
 }
+
+void CConfig::Set_nPoin_samplingLines(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z){
+
+	nPoin_samplingLines = new unsigned long[3];
+	nPoin_samplingLines[0] = nPoin_x;
+	nPoin_samplingLines[1] = nPoin_y;
+	nPoin_samplingLines[2] = nPoin_z;
+
+}
+
+void CConfig::Initialize_samplingLines(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z){
+
+	unsigned long iPoin, jPoin;
+
+	samplingLines = new unsigned long **[nPoin_x];
+	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+		samplingLines[iPoin] = new unsigned long *[nPoin_y];
+		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
+			samplingLines[iPoin][jPoin] = new unsigned long [nPoin_z];
+		}
+	}
+}
+
+void CConfig::Set_samplingLines(unsigned long xx, unsigned long yy, unsigned long zz, unsigned long val){
+	samplingLines[xx][yy][zz-1] = val;
+}
+
