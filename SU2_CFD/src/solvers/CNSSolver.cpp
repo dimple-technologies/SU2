@@ -1848,6 +1848,30 @@ void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config
 	/*--- Compute R-factor bby interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
 	/*--- R represents the % firction drag reduction compared to a flat plate ---*/
 
+	su2double *xx, *yy, **zz, *xint;
+
+	xx = new su2double [config->Get_nPoinx_Ricco()];
+	yy = new su2double [config->Get_nPoiny_Ricco()];
+	zz = new su2double* [config->Get_nPoinx_Ricco()];
+	xint = new su2double [2];
+
+	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++){
+		xx[iPoin] = config->Get_RiccoField(0, iPoin,0);			// only one row is necessary for bilinear interp on ordered grid of points.
+		zz[iPoin] = new su2double [config->Get_nPoiny_Ricco()];
+		for (jPoin = 0; jPoin < config->Get_nPoiny_Ricco(); jPoin++){
+			yy[jPoin] = config->Get_RiccoField(jPoin, 0, 1);	// only one columns is necessary for bilinear interp on ordered grid of points.
+			zz[iPoin][jPoin] = config->Get_RiccoField(iPoin, jPoin, 2);
+		}
+	}
+
+
+	xint[0] = tot_avg_period;
+	xint[1] = tot_avg_amplitude;
+
+
+	su2double R;
+	R =  LinearInt_bilininterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
+
 
 }
 
@@ -2021,5 +2045,79 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
 //		cout << endl;
 //
 //	}
+
+}
+
+unsigned long CNSSolver::LinearInt_locate(su2double *xx, unsigned long n, su2double x){
+
+	/*--- Main code from "Numerical Recipes: The Art of Scientific Computing, Third Edition in C++, pg. 115" ---*/
+
+	/* Given a value x, return a value j such that x is (insofar as possible) centered in the subrange
+	xx[j..j+mm-1], where xx is the stored pointer. The values in xx must be monotonic, either
+	increasing or decreasing. The returned value is not less than 0, nor greater than n-1.*/
+
+	/* INPUTS:
+	 * xx : Ordered 1D array
+	 * n : size of xx
+	 * x : location where to interpolate
+	 */
+
+	unsigned long mm = 2; //HARDCODED FOR LINIEAR INTERPOLATION
+
+	unsigned long ju,jm,jl;
+	if (n < 2 || mm < 2 || mm > n) throw("locate size error");
+	bool ascnd = (xx[n-1] >= xx[0]);	// True if ascending order of table, false otherwise.
+
+	jl = 0; 							// Initialize lower ...
+	ju = n-1; 							//	...and upper limits.
+
+	while (ju-jl > 1) {					// If we are not yet done, ...
+		jm = (ju+jl) >> 1;				// ...  compute a midpoint, ...
+		if (x >= xx[jm] == ascnd)		// ... and replace either the lower limit...
+			jl = jm;
+		else							// ... or the upper limit, as appropriate.
+			ju = jm;
+	}									//	Repeat until the test condition is satisfied.
+
+	unsigned long aaa, bbb = 0;
+	aaa = min(n-mm, jl-((mm-2)>>1));
+
+	return max( bbb, aaa );				//return the location of the lower side of xx containing x, i.e. xx[lower] < x < xx[lower+1]
+
+}
+
+su2double CNSSolver::LinearInt_bilininterp(su2double *xx, unsigned long nx, su2double *yy, unsigned long ny, su2double **zz, su2double *xint){
+
+	/*--- Main code from "Numerical Recipes: The Art of Scientific Computing, Third Edition in C++, pg. 132-134" ---*/
+
+	/* bilinear interpolation on a matrix. Construct with a vector of xx values, a vector of
+	yy values, and a matrix of tabulated function values zz . Then call interp for interpolated
+	values.*/
+
+	/* INPUTS:
+	 * xx : Ordered 1D array
+	 * yy : Ordered 1D array
+	 * zz : 2D array with the function values f(xx,yy)
+	 * nx, ny : size of xx, yy.
+	 * xint : (x,y) location where to interpolate
+	 */
+
+	unsigned long i,j;
+	su2double x,y,val,u,t;
+
+	x = xint[0];
+	y = xint[1];
+
+	/*--- Find the grid square ---*/
+	i = LinearInt_locate(xx, nx, x);
+	j = LinearInt_locate(yy, ny, y);
+
+	/*--- Interpolate ---*/
+	t = (x - xx[i]) / (xx[i+1] - xx[i]);
+	u = (y - yy[j]) / (yy[j+1] - yy[j]);
+
+	val = (1.0 - t)*(1.0 - u)*zz[i][j] + t*(1.0 - u)*zz[i+1][j]	+ (1.0 - t)*u*zz[i][j+1] + t*u*zz[i+1][j+1];
+
+	return val;
 
 }

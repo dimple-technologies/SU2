@@ -1221,7 +1221,6 @@ void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
 				config->Set_RiccoField(xx,yy,zz,val);
 				++yy;
 			}
-			cout << endl;
 			++xx;
 		}
 	}

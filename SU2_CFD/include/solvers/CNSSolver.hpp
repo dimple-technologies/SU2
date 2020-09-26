@@ -569,6 +569,10 @@ public:
 								  su2double **x_loc_peaks,
 								  su2double **amplitude_peaks);
 
+  unsigned long LinearInt_locate(su2double *xx, unsigned long n, su2double x);
+
+  su2double LinearInt_bilininterp(su2double *xx, unsigned long nx, su2double *yy, unsigned long ny, su2double **zz, su2double *xint);
+
 };
 
 
