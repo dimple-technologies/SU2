@@ -1106,7 +1106,7 @@ void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
 
   unsigned long nPointLocal, nPointGlobal;
   unsigned long iPoin, jPoin, kPoin, local_index;
-  unsigned short nPoin_x, nPoin_y, nPoin_z;
+  unsigned long nPoin_x, nPoin_y, nPoin_z;
 
   nPointLocal = nPointDomain;
 #ifdef HAVE_MPI
@@ -1180,5 +1180,63 @@ void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
 //		  cout << endl;
 //	  }
 //  }
+
+
+  /*--- Read RiccoField.dat ---*/
+  input_filename = "RiccoField.dat";
+  input_file.open(input_filename.data(), ios::in);
+  unsigned short nPoin_x_Ricco, nPoin_y_Ricco, nPoin_z_Ricco;
+
+  if (input_file.fail()) {
+	  if (rank == MASTER_NODE)
+		  cout << "WARNING: There is no input file " << input_filename.data() << ". THIS MESSAGE SHOULD BE CONVERTED INTO AN ERROR!"<< endl;
+  }
+  else{
+
+	unsigned long xx, yy, zz;
+	su2double val;
+	zz = 0;
+
+	/*--- Read head of the file for allocation ---*/
+	getline (input_file, text_line);
+	istringstream point_line(text_line);
+	point_line >> nPoin_x_Ricco >> nPoin_y_Ricco;
+
+	/*--- Set the value of nPoin_x, nPoin_y, nPoin_z ---*/
+	config->Set_nPoin_Ricco(nPoin_x_Ricco, nPoin_y_Ricco, 3);
+
+	/*--- Initialize the matrix samplingLines ---*/
+	config->Initialize_RiccoField(nPoin_x_Ricco, nPoin_y_Ricco, 3);
+
+	/*--- Read Global Indexes from file ---*/
+	while (getline (input_file, text_line)){
+		istringstream point_line(text_line);
+		if (text_line[0] == 'c'){ /* if the line starts with coord-..., then it's just a header -> skip it */
+			++zz;
+			xx = 0;
+		}
+		else{
+			yy = 0;
+			while(point_line >> val){
+				config->Set_RiccoField(xx,yy,zz,val);
+				++yy;
+			}
+			cout << endl;
+			++xx;
+		}
+	}
+  }
+  input_file.close();
+  cout << "RiccoField.dat read." << endl;
+
+//    /* Uncomment if need to debug */
+//    if (rank == MASTER_NODE){
+//  	  for (iPoin=0; iPoin < config->Get_nPoinx_Ricco(); iPoin++){
+//  		  for (jPoin=0; jPoin < config->Get_nPoiny_Ricco(); jPoin++){
+//  			  cout << config->Get_RiccoField(iPoin, jPoin, 2) << " ";
+//  		  }
+//  		  cout << endl;
+//  	  }
+//    }
 
 }

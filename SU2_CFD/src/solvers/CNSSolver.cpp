@@ -1778,10 +1778,18 @@ void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config
     su2double delta = 5e-2; //HARDCODED
 	Find_peaks_and_throughs(Wm_plus, x_at_wall, nPoin_x, nPoin_z, delta, peaks, x_loc_peaks, amplitude_peaks);
 
-	su2double *avg_amplitude, *avg_wavelength;
+	/*--- Initialize variables for next routine ---*/
+	su2double *avg_amplitude, *avg_wavelength, *avg_period;
 	avg_amplitude = new su2double [nPoin_z];
 	avg_wavelength = new su2double [nPoin_z];
+	avg_period = new su2double [nPoin_z];
 	unsigned long count;
+	unsigned long count_peaks, count_throughs;
+	unsigned long jj, kk;
+	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
+	su2double tot_avg_amplitude, tot_avg_period;
+	tot_avg_amplitude = 0;
+	tot_avg_period = 0;
 
 	/*---Compute average wave amplitude ---*/
 	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
@@ -1793,14 +1801,12 @@ void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config
 				count += 1; //count the number of peaks/throughs
 			}
 		}
-		avg_amplitude[kPoin] /= count;
+		avg_amplitude[kPoin] /= count;			  // average amplitude of the slice
+		tot_avg_amplitude += avg_amplitude[kPoin]; // average amplitude of the entire test case (Wm+)
 	}
+	tot_avg_amplitude /= nPoin_z;
 
 	/*---Compute average wavelength :  avg_wavelength = (max(x_loc) - min(x_loc))/number of waves---*/
-	unsigned long count_peaks, count_throughs;
-	unsigned long jj, kk;
-	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
-
 	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
 		avg_wavelength[kPoin] = 0; // initialize to zero
 		count_peaks = 0; count_throughs = 0;
@@ -1832,9 +1838,16 @@ void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config
 
 		}
 		avg_wavelength[kPoin] = (max_loc_peak-min_loc_peak)/count_peaks + (max_loc_through - min_loc_through)/count_throughs;
-		avg_wavelength[kPoin] /= Velocity_Inf[0]; // transform from wavelength (m) to period (s)
-		avg_wavelength[kPoin] *= u_tau*u_tau / nu; //normalize
+		avg_period[kPoin] /= Velocity_Inf[0]; // transform from wavelength (m) to period (s)
+		avg_period[kPoin] *= u_tau*u_tau / nu; //normalize
+		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
 	}
+	tot_avg_period /= nPoin_z;
+
+
+	/*--- Compute R-factor bby interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
+	/*--- R represents the % firction drag reduction compared to a flat plate ---*/
+
 
 }
 

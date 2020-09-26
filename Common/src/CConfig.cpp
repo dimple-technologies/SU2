@@ -9605,6 +9605,15 @@ void CConfig::Set_nPoin_samplingLines(unsigned long nPoin_x, unsigned long nPoin
 
 }
 
+void CConfig::Set_nPoin_Ricco(unsigned long nPoin_x_Ricco, unsigned long nPoin_y_Ricco, unsigned long nPoin_z_Ricco){
+
+	nPoin_Ricco = new unsigned long[3];
+	nPoin_Ricco[0] = nPoin_x_Ricco;
+	nPoin_Ricco[1] = nPoin_y_Ricco;
+	nPoin_Ricco[2] = nPoin_z_Ricco;
+
+}
+
 void CConfig::Initialize_samplingLines(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z){
 
 	unsigned long iPoin, jPoin;
@@ -9618,7 +9627,24 @@ void CConfig::Initialize_samplingLines(unsigned long nPoin_x, unsigned long nPoi
 	}
 }
 
+void CConfig::Initialize_RiccoField(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z){
+
+	unsigned long iPoin, jPoin;
+
+	RiccoField = new su2double **[nPoin_x];
+	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+		RiccoField[iPoin] = new su2double *[nPoin_y];
+		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
+			RiccoField[iPoin][jPoin] = new su2double [nPoin_z];
+		}
+	}
+}
+
 void CConfig::Set_samplingLines(unsigned long xx, unsigned long yy, unsigned long zz, unsigned long val){
 	samplingLines[xx][yy][zz-1] = val;
+}
+
+void CConfig::Set_RiccoField(unsigned long xx, unsigned long yy, unsigned long zz, su2double val){
+	RiccoField[xx][yy][zz-1] = val;
 }
 

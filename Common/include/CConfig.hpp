@@ -1141,8 +1141,9 @@ private:
   unsigned short Kind_Inlet_InterpolationType;    /*!brief type of spanwise interpolation data to use for the inlet face. */
   bool PrintInlet_InterpolatedData;               /*!brief option for printing the interpolated data file. */
 
-  unsigned long *nPoin_samplingLines;
+  unsigned long *nPoin_samplingLines, *nPoin_Ricco;
   unsigned long ***samplingLines;
+  su2double ***RiccoField;
   bool stokesLayerMethod;
 
   /*!
@@ -9386,13 +9387,25 @@ public:
 
   void Set_nPoin_samplingLines(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z);
 
+  void Set_nPoin_Ricco(unsigned long nPoin_x_Ricco, unsigned long nPoin_y_Ricco, unsigned long nPoin_z_Ricco);
+
   unsigned long Get_nPoinx_samplingLines(void){ return nPoin_samplingLines[0]; };
   unsigned long Get_nPoiny_samplingLines(void){ return nPoin_samplingLines[1]; };
   unsigned long Get_nPoinz_samplingLines(void){ return nPoin_samplingLines[2]; };
 
+  unsigned long Get_nPoinx_Ricco(void){ return nPoin_Ricco[0]; };
+  unsigned long Get_nPoiny_Ricco(void){ return nPoin_Ricco[1]; };
+  unsigned long Get_nPoinz_Ricco(void){ return nPoin_Ricco[2]; };
+
   void Initialize_samplingLines(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z);
+  void Initialize_RiccoField(unsigned long nPoin_x, unsigned long nPoin_y, unsigned long nPoin_z);
+
   void Set_samplingLines(unsigned long xx, unsigned long yy, unsigned long zz, unsigned long val);
+  void Set_RiccoField(unsigned long xx, unsigned long yy, unsigned long zz, su2double val);
+
   unsigned long Get_samplingLines(unsigned long xx, unsigned long yy, unsigned long zz){ return samplingLines[xx][yy][zz]; };
+  su2double Get_RiccoField(unsigned long xx, unsigned long yy, unsigned long zz){ return RiccoField[xx][yy][zz]; };
+
   void Set_boolsamplingLines(void) { stokesLayerMethod = true; }
   bool Get_boolsamplingLines(void) { return stokesLayerMethod; }
 
