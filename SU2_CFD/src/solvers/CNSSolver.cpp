@@ -104,6 +104,18 @@ CNSSolver::CNSSolver(CGeometry *geometry, CConfig *config, unsigned short iMesh)
 
   }
 
+  unsigned long nPointLocal, nPointGlobal;
+	nPointLocal = nPointDomain;
+#ifdef HAVE_MPI
+SU2_MPI::Allreduce(&nPointLocal, &nPointGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+#else
+nPointGlobal = nPointLocal; //Total number of points in the domain (no halo nodes considered)
+#endif
+
+  if (config->Get_boolsamplingLines() == true){
+	  u_tau = new su2double[nPointGlobal];
+  }
+
   /*--- Read farfield conditions from config ---*/
 
   Viscosity_Inf   = config->GetViscosity_FreeStreamND();
@@ -546,6 +558,9 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
         /*--- Compute y+ and non-dimensional velocity ---*/
 
         FrictionVel = sqrt(fabs(WallShearStress)/Density);
+        if (config->Get_boolsamplingLines() == true){
+        	SetFrictionVel(iPoint, FrictionVel);
+        }
         YPlus[iMarker][iVertex] = WallDistMod*FrictionVel/(Viscosity/Density);
 
         /*--- Compute total and maximum heat flux on the wall ---*/
@@ -1591,13 +1606,13 @@ void CNSSolver::SetTauWall_WF(CGeometry *geometry, CSolver **solver_container, C
 
 }
 
-void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config) {
+su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config) {
 
 	unsigned long iPoin, jPoin, kPoin, nPoin_x, nPoin_y, nPoin_z, local_index;
 	unsigned long nPointLocal, nPointGlobal;
 	unsigned long ***samplingLines;
 	su2double ***wm_plus, ***y_plus, ***x_pos, ***local_wm_plus, ***local_y_plus, ***local_x_pos;
-	su2double laminar_viscosity, eddy_viscosity, density, total_viscosity, nu, u_tau;
+	su2double laminar_viscosity, eddy_viscosity, density, total_viscosity, nu;
 
 	nPointLocal = nPointDomain;
 #ifdef HAVE_MPI
@@ -1607,11 +1622,8 @@ void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config
 #endif
 
 	nPoin_x = config->Get_nPoinx_samplingLines();
-	nPoin_y = config->Get_nPoiny_samplingLines();
+	nPoin_y = config->Get_nPoiny_samplingLines() - 1; //exclude mesh points at the wall
 	nPoin_z = config->Get_nPoinz_samplingLines();
-
-	u_tau = 1.0; /*HARDCODED*/
-	nu = 1.0; /*HARDCODED*/
 
 	local_wm_plus = new su2double **[nPoin_x];
 	local_y_plus = new su2double **[nPoin_x];
@@ -1619,43 +1631,50 @@ void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config
 	wm_plus = new su2double **[nPoin_x];
 	y_plus = new su2double **[nPoin_x];
 	x_pos = new su2double **[nPoin_x];
+
+	su2double **local_u_tau, **u_tau;
+	local_u_tau = new su2double *[nPoin_x];
+	u_tau = new su2double *[nPoin_x];
+	unsigned long local_index_b;
+
+	/*--- Compute the spanwise velocity (wm), wall distance (y_plus), the friction velocity ---*/
 	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+
+		local_u_tau[iPoin] = new su2double [nPoin_z];
 		local_wm_plus[iPoin] = new su2double *[nPoin_y];
 		local_y_plus[iPoin] = new su2double *[nPoin_y];
 		local_x_pos[iPoin] = new su2double *[nPoin_y];
+		u_tau[iPoin] = new su2double [nPoin_z];
 		wm_plus[iPoin] = new su2double *[nPoin_y];
 		y_plus[iPoin] = new su2double *[nPoin_y];
 		x_pos[iPoin] = new su2double *[nPoin_y];
+
 		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
+
 			local_wm_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			local_y_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			local_x_pos[iPoin][jPoin] = new su2double [nPoin_z];
 			wm_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			y_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			x_pos[iPoin][jPoin] = new su2double [nPoin_z];
-		}
-	}
 
-	/*--- Compute the normalized spanwise velocity (wm_plus) and the y+ (y_plus) ---*/
-	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
-		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
 			for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
-				local_index = config->Get_samplingLines(iPoin,jPoin,kPoin);
-				if (local_index == nPointGlobal+1){
+				local_index = config->Get_samplingLines(iPoin, jPoin, kPoin);
+				local_index_b = config->Get_samplingLines(iPoin, nPoin_y, kPoin); //points at the wall are stored at index nPoin_y
+				if (local_index == nPointGlobal+1){ //in CTurbSolver::ReadSamplingLines() local_index is set to nPointGlobal+1 if it does not belong to the subdomain.
 					local_wm_plus[iPoin][jPoin][kPoin] = 0;
 					local_y_plus[iPoin][jPoin][kPoin] = 0;
 					local_x_pos[iPoin][jPoin][kPoin] = 0;
+					local_u_tau[iPoin][kPoin] = 0;
 				}
 				else{
-					//UNCOMMENT BELOW LINES WHEN DEPLOYING FINAL CODE
-//					laminar_viscosity = nodes->GetLaminarViscosity(local_index);
-//					eddy_viscosity = nodes->GetEddyViscosity(local_index);
-//					density = nodes->GetDensity(local_index);
-//					total_viscosity = laminar_viscosity + eddy_viscosity;
-//					nu = total_viscosity / density;
-					local_wm_plus[iPoin][jPoin][kPoin] = nodes->GetVelocity(local_index,2) / u_tau;
-					local_y_plus[iPoin][jPoin][kPoin] = geometry->nodes->GetWall_Distance(local_index) * u_tau / nu;
-					local_x_pos[iPoin][jPoin][kPoin] = geometry->nodes->GetCoord(local_index,0);
+					laminar_viscosity 	= nodes->GetLaminarViscosity(local_index);
+					density 			= nodes->GetDensity(local_index);
+					nu 					= laminar_viscosity / density;
+					local_wm_plus[iPoin][jPoin][kPoin] = nodes->GetVelocity(local_index, 2); // spanwise velocity (w)
+					local_y_plus[iPoin][jPoin][kPoin] = geometry->nodes->GetWall_Distance(local_index) / nu; // wall distance same formula as in CNSsolver::Firction_Forces()
+					local_x_pos[iPoin][jPoin][kPoin] = geometry->nodes->GetCoord(local_index, 0);	// streamwise coordinate (x)
+					local_u_tau[iPoin][kPoin] = GetFrictionVel(local_index_b);
 				}
 			}
 		}
@@ -1674,278 +1693,449 @@ void CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *config
 			}
 	    }
     }
+
+	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+		for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
+			SU2_MPI::Allreduce(&local_u_tau[iPoin][kPoin], &u_tau[iPoin][kPoin], 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		}
+    }
+#else
+	&wm_plus= &local_wm_plus;
+	&y_plus = &local_y_plus;
+	&x_pos 	= &local_x_pos;
+	&u_tau 	= &local_u_tau;
 #endif
 
-
-	//	  /* Uncomment if need to debug */
-	//	  if (rank == MASTER_NODE){
-	//		  for (iPoin=0; iPoin < config->Get_nPoinx_samplingLines(); iPoin++){
-	//			  for (jPoin=0; jPoin < config->Get_nPoiny_samplingLines(); jPoin++){
-	//				  unsigned long ii = config->Get_samplingLines(iPoin,jPoin,0);
-	//				  if (ii == nPointGlobal+1){ cout << 0 << " "; }
-	//				  else{cout << geometry->nodes->GetGlobalIndex(ii) << " ";}
-	//			  }
-	//			  cout << endl;
-	//		  }
-	//	  }
-	//	  cout << endl;
-	//
-	//	  /* Uncomment if need to debug */
-	//	  if (rank == MASTER_NODE){
-	//		  for (iPoin=0; iPoin < config->Get_nPoinx_samplingLines(); iPoin++){
-	//			  for (jPoin=0; jPoin < config->Get_nPoiny_samplingLines(); jPoin++){
-	//				  cout << y_plus[iPoin][jPoin][0] << " ";
-	//			  }
-	//			  cout << endl;
-	//		  }
-	//	  }
-
+	/* --- Divide by u_tau: wm_plus = wm / u_tau, y_plus = wall_dist * u_tau / nu ---*/
+	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
+			for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
+				y_plus[iPoin][jPoin][kPoin] *= u_tau[iPoin][kPoin] ; // wall distance
+				wm_plus[iPoin][jPoin][kPoin] /= u_tau[iPoin][kPoin]; // spanwise velocity (w)
+			}
+		}
+	}
 
 	/*--- Fit the exponential to compute the 'equivalent spanwise velocity at the wall' (Wm_plus);
 	 * the relationship is wm+ = exp(Wm+, -A*y+), where Wm+ and A need to be fitted. ---*/
 
 	su2double **Wm_plus; // initialize Matrix of equivalent spanwise velocity (i.e. a wave) at the wall
 	su2double **x_at_wall; // streamwise coordinates at the wall along a slice
+	su2double **B;
+	unsigned long ***peaks;
 
-	Wm_plus = new su2double*[nPoin_x]; // one wave for every spanwise (z_coord) slice
+	Wm_plus = new su2double*[nPoin_x];				//each wave is evaluated along the streamwise direction (x-coord)
 	x_at_wall = new su2double*[nPoin_x];
+	B = new su2double*[nPoin_x];
+	peaks = new unsigned long**[nPoin_x];
 	for (iPoin = 0; iPoin < nPoin_x; iPoin++){
-		Wm_plus[iPoin] = new su2double[nPoin_z]; //each wave is evaluated along the streamwise direction (x-coord)
+		Wm_plus[iPoin] = new su2double[nPoin_z];	// one wave for every spanwise (z_coord) slice
 		x_at_wall[iPoin] = new su2double[nPoin_z];
+		B[iPoin] = new su2double[nPoin_z];
+		peaks[iPoin] = new unsigned long*[3]; 		// one element to store whether it's a peak or a through; one to store the index; one to store change of sign index;
+		for (jPoin = 0; jPoin < 3; jPoin++){
+			peaks[iPoin][jPoin] = new unsigned long[nPoin_z];
+		}
 	}
 
-//	// Uncomment if need to debug
-//	for (jPoin=0; jPoin<nPoin_y; jPoin++){
-//		unsigned long ii = config->Get_samplingLines(0,jPoin,0);
-//		if (ii == nPointGlobal+1){ cout << 0 << " "; }
-//		else{cout << geometry->nodes->GetCoord(ii,0) << ", ";}
-//	}
-//	cout << endl;
+	/*--- Find inflection point closest to wall ---*/
+	Find_peak_closest_to_wall(wm_plus, nPoin_x, nPoin_y, nPoin_z, 5e-4, peaks);
+
+	/*--- Find index of closest point to inflection point where wm_plus changes sign ---*/
+	Find_change_of_sign(wm_plus, nPoin_x, nPoin_y, nPoin_z, peaks);
+
+//	kPoin = 45;
 //
-//	// Uncomment if need to debug
-//	cout << endl;
-//	for (jPoin=0; jPoin<nPoin_y; jPoin++) {
-//		cout << y_plus[0][jPoin][0] << ", ";
-//	}
-//	cout << endl;
-//
-//	// Uncomment if need to debug
-//	for (jPoin=0; jPoin<nPoin_y; jPoin++){
-//		unsigned long ii = config->Get_samplingLines(0,jPoin,0);
-//		if (ii == nPointGlobal+1){ cout << 0 << " "; }
-//		else{cout << geometry->nodes->GetCoord(ii,2) << ", ";}
-//	}
-//	cout << endl;
-//
-//	// Uncomment if need to debug
-//	for (jPoin=0; jPoin<nPoin_y; jPoin++) {
-//		cout << wm_plus[0][jPoin][0] << ", ";
-//	}
-//	cout << endl;
-
-
-
-	Fit_exponential(wm_plus, y_plus, x_pos, nPoin_x, nPoin_y, nPoin_z, Wm_plus, x_at_wall);
-
-//	// Uncomment if need to debug
+//	ofstream myfile;
+//	/*--- Uncomment if need to debug ---*/
 //	if (rank == MASTER_NODE){
-//		for (iPoin = 0; iPoin < nPoin_x; iPoin++)
-//			cout << Wm_plus[iPoin][5] << ", ";	//z=5 to print data from a slice away from the side boundary (z=0)
-//		cout << endl;
+//		myfile.open ("tests/peaks.dat", ios::out);
+//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+//			myfile << peaks[iPoin][1][kPoin] << ", ";
+//		}
+//		myfile << peaks[nPoin_x-1][1][kPoin] << endl;
+//		myfile.close();
+//	}
 //
-//		for (iPoin = 0; iPoin < nPoin_x; iPoin++)
-//			cout << x_pos[iPoin][0][5] << ", ";
-//		cout << endl;
+//	/*--- Uncomment if need to debug ---*/
+//	if (rank == MASTER_NODE){
+//		myfile.open ("tests/sign_change.dat", ios::out);
+//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+//				myfile << peaks[iPoin][2][kPoin] << ", " ;
+//		}
+//		myfile << peaks[nPoin_x-1][2][kPoin] << endl;
+//		myfile.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile.open ("tests/y_plus.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y; jPoin++){
+//				myfile << y_plus[iPoin][jPoin][kPoin] << ", ";
+//			}
+//		}
+//		myfile.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile.open ("tests/wm_plus.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y; jPoin++){
+//				myfile << wm_plus[iPoin][jPoin][kPoin] << ", ";
+//			}
+//		}
+//		myfile.close();
 //	}
 
-//    su2double *Wm_pluss;
-//    Wm_pluss = new su2double[nPoin_x];
-//    for (iPoin = 0; iPoin < nPoin_x; iPoin++){
-//    	Wm_pluss[iPoin] = Wm_plus[iPoin][5];
+	/*--- Compute equivalent spanwise oscialltion at the wall ---*/
+	Fit_exponential(wm_plus, y_plus, x_pos, nPoin_x, nPoin_y, nPoin_z, Wm_plus, x_at_wall, B, peaks);
+
+//	// VERIFICATION: For each slice, for each x, plot the actual wm_plus and the fitted exponential. Visually check they make sense.
+
+//	for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//		cout << "(" << iPoin << "): Aint = " << Wm_plus[iPoin][kPoin] << " , Bint = " << B[iPoin][kPoin] << endl;;
+//	}
+//	cout << endl;
+
+//	/*--- For each slice, find peaks and throughs of the equivalent spanwise oscillation at the wall (Wm_plus) ---*/
+//	su2double **peaks, **x_loc_peaks,  **amplitude_peaks;
+//    peaks = new su2double*[nPoin_x];
+//    x_loc_peaks = new su2double*[nPoin_x];
+//    amplitude_peaks = new su2double*[nPoin_x];
+//    for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//    	peaks[iPoin] = new su2double [nPoin_z];
+//    	x_loc_peaks[iPoin] = new su2double [nPoin_z];
+//    	amplitude_peaks[iPoin] = new su2double [nPoin_z];
 //    }
+//
+//    su2double delta = 5e-2; //HARDCODED
+//	Find_peaks_and_throughs(Wm_plus, x_at_wall, nPoin_x, nPoin_z, delta, peaks, x_loc_peaks, amplitude_peaks);
+//
+//	// VERIFICATION: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
+//
+//	/*--- Initialize variables for next routine ---*/
+//	su2double *avg_amplitude, *avg_wavelength, *avg_period, *avg_utau;
+//	avg_amplitude = new su2double [nPoin_z];
+//	avg_wavelength = new su2double [nPoin_z];
+//	avg_period = new su2double [nPoin_z];
+//	avg_utau = new su2double [nPoin_z];
+//	unsigned long count;
+//	unsigned long count_peaks, count_throughs;
+//	unsigned long jj, kk;
+//	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
+//	su2double tot_avg_amplitude, tot_avg_period;
+//	tot_avg_amplitude = 0;
+//	tot_avg_period = 0;
+//
+//	/*---Compute average wave amplitude ---*/
+//	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
+//		avg_amplitude[kPoin] = 0; // initialize to zero
+//		count = 0;
+//		for (iPoin = 0; iPoin < nPoin_x; iPoin++){
+//			if (amplitude_peaks[iPoin][kPoin] != 0){
+//				avg_amplitude[kPoin] += abs(amplitude_peaks[iPoin][kPoin]);
+//				count += 1; //count the number of peaks/throughs
+//			}
+//		}
+//		avg_amplitude[kPoin] /= count;			  // average amplitude of the slice
+//		tot_avg_amplitude += avg_amplitude[kPoin]; // average amplitude of the entire test case (Wm+)
+//	}
+//	tot_avg_amplitude /= nPoin_z;
+//
+//	// VERIFICATION: For each slice, compare avg_amplitude with the one computed in Python. In general, check the order of magnitude makes sense.
+//	// VERIFICATION: verify routine works using synthetic data.
+//
+//	/*---Compute average wavelength :  avg_wavelength = (max(x_loc) - min(x_loc))/number of waves---*/
+//	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
+//		avg_wavelength[kPoin] = 0; // initialize to zero
+//		avg_utau[kPoin] = 0;
+//		count_peaks = 0; count_throughs = 0;
+//		jj=0; kk=0;
+//
+//		for (iPoin = nPoin_x-1; iPoin > 0; iPoin--){ //traverse array from the back
+//
+//			if (peaks[iPoin][kPoin] == 1){ // check whether it is a peak (or a through)
+//				if (jj == 0){
+//					max_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate max(x_loc) of a peak
+//					jj++;
+//				}
+//				else{
+//					min_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate temporary x-loc of a peak; after the array has been completely traversed, it will be min(x_loc)
+//					count_peaks += 1;
+//				}
+//			}
+//
+//			if (peaks[iPoin][kPoin] == -1){
+//				if (kk == 0){
+//					max_loc_through = x_loc_peaks[iPoin][kPoin];
+//					kk++;
+//				}
+//				else{
+//					min_loc_through = x_loc_peaks[iPoin][kPoin];
+//					count_throughs += 1;
+//				}
+//			}
+//
+//			avg_utau[kPoin] += u_tau[iPoin][kPoin];
+//
+//		}
+//		avg_utau[kPoin] /= nPoin_x;
+//		avg_wavelength[kPoin] = (max_loc_peak-min_loc_peak)/count_peaks + (max_loc_through - min_loc_through)/count_throughs;
+//		avg_period[kPoin] /= Velocity_Inf[0]; // transform from wavelength (m) to period (s)
+//		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu; //normalize
+//		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
+//	}
+//	tot_avg_period /= nPoin_z;
+//
+//	// VERIFICATION: For each slice, compare avg_period with the one computed in Python. In general, check the order of magnitude makes sense.
+//	// VERIFICATION: verify routine works using synthetic data.
+//
+//	/*--- Compute R-factor by interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
+//	/*--- R represents the % friction drag reduction compared to a flat plate ---*/
+//
+//	su2double *xx, *yy, **zz, *xint;
+//
+//	xx = new su2double [config->Get_nPoinx_Ricco()];
+//	yy = new su2double [config->Get_nPoiny_Ricco()];
+//	zz = new su2double* [config->Get_nPoinx_Ricco()];
+//	xint = new su2double [2];
+//
+//	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++){
+//		xx[iPoin] = config->Get_RiccoField(0, iPoin, 0);			// only one row is necessary for bilinear interp on an *ordered grid* of points.
+//		zz[iPoin] = new su2double [config->Get_nPoiny_Ricco()];
+//		for (jPoin = 0; jPoin < config->Get_nPoiny_Ricco(); jPoin++){
+//			yy[jPoin] = config->Get_RiccoField(jPoin, 0, 1);	// only one column is necessary for bilinear interp on an *ordered grid* of points.
+//			zz[iPoin][jPoin] = config->Get_RiccoField(iPoin, jPoin, 2);
+//		}
+//	}
+//
+//
+//	xint[0] = tot_avg_period;
+//	xint[1] = tot_avg_amplitude;
+//
+//
+//	su2double R;
+//	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
+//
+//	// VERIFICATION: verify routine works using synthetic data.
+//
+//	su2double Re_tau_flat_plate = 1.0; //placeholder
+//	R = ReynoldsScalingRicco(R, Re_tau_flat_plate);
+//
+//	// VERIFICATION: verify routine works using synthetic data.
+//
+//	// VERIFICATION: check the order of magnitude of R makes sense.
+//
+//	su2double flat_plate_viscous_drag = 1.0; //placeholder
+//
+//	return R * flat_plate_viscous_drag;
 
-
-	su2double **peaks, **x_loc_peaks,  **amplitude_peaks;
-    peaks = new su2double*[nPoin_x];
-    x_loc_peaks = new su2double*[nPoin_x];
-    amplitude_peaks = new su2double*[nPoin_x];
-    for (iPoin=0; iPoin < nPoin_x; iPoin++){
-    	peaks[iPoin] = new su2double [nPoin_z];
-    	x_loc_peaks[iPoin] = new su2double [nPoin_z];
-    	amplitude_peaks[iPoin] = new su2double [nPoin_z];
-    }
-
-    su2double delta = 5e-2; //HARDCODED
-	Find_peaks_and_throughs(Wm_plus, x_at_wall, nPoin_x, nPoin_z, delta, peaks, x_loc_peaks, amplitude_peaks);
-
-	/*--- Initialize variables for next routine ---*/
-	su2double *avg_amplitude, *avg_wavelength, *avg_period;
-	avg_amplitude = new su2double [nPoin_z];
-	avg_wavelength = new su2double [nPoin_z];
-	avg_period = new su2double [nPoin_z];
-	unsigned long count;
-	unsigned long count_peaks, count_throughs;
-	unsigned long jj, kk;
-	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
-	su2double tot_avg_amplitude, tot_avg_period;
-	tot_avg_amplitude = 0;
-	tot_avg_period = 0;
-
-	/*---Compute average wave amplitude ---*/
-	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
-		avg_amplitude[kPoin] = 0; // initialize to zero
-		count = 0;
-		for (iPoin = 0; iPoin < nPoin_x; iPoin++){
-			if (amplitude_peaks[iPoin][kPoin] != 0){
-				avg_amplitude[kPoin] += abs(amplitude_peaks[iPoin][kPoin]);
-				count += 1; //count the number of peaks/throughs
-			}
-		}
-		avg_amplitude[kPoin] /= count;			  // average amplitude of the slice
-		tot_avg_amplitude += avg_amplitude[kPoin]; // average amplitude of the entire test case (Wm+)
-	}
-	tot_avg_amplitude /= nPoin_z;
-
-	/*---Compute average wavelength :  avg_wavelength = (max(x_loc) - min(x_loc))/number of waves---*/
-	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
-		avg_wavelength[kPoin] = 0; // initialize to zero
-		count_peaks = 0; count_throughs = 0;
-		jj=0; kk=0;
-
-		for (iPoin = nPoin_x-1; iPoin > 0; iPoin--){ //traverse array from the back
-
-			if (peaks[iPoin][kPoin] == 1){ // check whether it is a peak (or a through)
-				if (jj == 0){
-					max_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate max(x_loc) of a peak
-					jj++;
-				}
-				else{
-					min_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate temporary x-loc of a peak; after the array has been completely traversed, it will be min(x_loc)
-					count_peaks += 1;
-				}
-			}
-
-			if (peaks[iPoin][kPoin] == -1){
-				if (kk == 0){
-					max_loc_through = x_loc_peaks[iPoin][kPoin];
-					kk++;
-				}
-				else{
-					min_loc_through = x_loc_peaks[iPoin][kPoin];
-					count_throughs += 1;
-				}
-			}
-
-		}
-		avg_wavelength[kPoin] = (max_loc_peak-min_loc_peak)/count_peaks + (max_loc_through - min_loc_through)/count_throughs;
-		avg_period[kPoin] /= Velocity_Inf[0]; // transform from wavelength (m) to period (s)
-		avg_period[kPoin] *= u_tau*u_tau / nu; //normalize
-		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
-	}
-	tot_avg_period /= nPoin_z;
-
-
-	/*--- Compute R-factor bby interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
-	/*--- R represents the % firction drag reduction compared to a flat plate ---*/
-
-	su2double *xx, *yy, **zz, *xint;
-
-	xx = new su2double [config->Get_nPoinx_Ricco()];
-	yy = new su2double [config->Get_nPoiny_Ricco()];
-	zz = new su2double* [config->Get_nPoinx_Ricco()];
-	xint = new su2double [2];
-
-	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++){
-		xx[iPoin] = config->Get_RiccoField(0, iPoin,0);			// only one row is necessary for bilinear interp on ordered grid of points.
-		zz[iPoin] = new su2double [config->Get_nPoiny_Ricco()];
-		for (jPoin = 0; jPoin < config->Get_nPoiny_Ricco(); jPoin++){
-			yy[jPoin] = config->Get_RiccoField(jPoin, 0, 1);	// only one columns is necessary for bilinear interp on ordered grid of points.
-			zz[iPoin][jPoin] = config->Get_RiccoField(iPoin, jPoin, 2);
-		}
-	}
-
-
-	xint[0] = tot_avg_period;
-	xint[1] = tot_avg_amplitude;
-
-
-	su2double R;
-	R =  LinearInt_bilininterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
-
+	return 1.0;
 
 }
 
+//void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2double ***x_pos, unsigned long nPoin_x, unsigned long nPoin_y,
+//		                        unsigned long nPoin_z, su2double **Wm_plus, su2double **x_at_wall, su2double **B) {
+//
+//	/*--- Main code from "Numerical Recipes: The Art of Scientific Computing, Third Edition in C++, pages 781-785" ---*/
+//
+//	unsigned long iPoin, jPoin, kPoin;
+//	su2double ss, sx=0., sy=0., st2=0., t, sxoss;
+//	su2double a, b;
+//	su2double siga, sigb, chi2, q, sigdat;
+//	su2double *x, *y;
+//
+//	su2double konst = 100.00;
+//
+//	x = new su2double[nPoin_y];
+//	y = new su2double[nPoin_y];
+//
+//	for (iPoin = 0; iPoin < nPoin_x; iPoin++){		// loop over each streamwise location
+//		for (kPoin = 0; kPoin < nPoin_z; kPoin++){	// loop over each slice
+//
+//			// Store x-coord at (closest mesh point to) the wall (jPoin=0 -> farthest from the wall; jPoin=nPoin_y-1 -> closest to the wall).
+//			x_at_wall[iPoin][kPoin] = x_pos[iPoin][nPoin_y-1][kPoin];
+//
+//			/*--- Start with fitting ---*/
+//			sx=0.0; sy=0.0; st2=0.0;
+//			b=0.0;
+//
+//			/*--- Transform wm+ = Wm*exp(B*y+) into a linear form log(wm+) = log(Wm+) + B*y+;
+//			 * i.e. y = a + bx, where y = log(wm+), a = log(Wm+), b = B, x = y+ ---*/
+//			for (jPoin=0; jPoin<nPoin_y; jPoin++) {
+//				x[jPoin] = y_plus[iPoin][jPoin][kPoin];
+//				y[jPoin] = log(wm_plus[iPoin][jPoin][kPoin] + konst); // add konst to avoid having to take log of -ve numbers
+//			}
+//
+//			/*--- Accumulate sums without weights. ---*/
+//			for (jPoin=0; jPoin<nPoin_y; jPoin++) {
+//				sx += x[jPoin];
+//				sy += y[jPoin];
+//			}
+//			ss = nPoin_y;
+//			sxoss = sx/ss;
+//
+//			for (jPoin=0; jPoin<nPoin_y; jPoin++) {
+//				t = x[jPoin]-sxoss;
+//				st2 += t*t;
+//				b += t*y[jPoin];
+//			}
+//
+//			/*--- Solve for a, b ---*/
+//			b /= st2;
+//			a = (sy-sx*b)/ss;
+//
+//
+//			/*---Compute Wm+ and B ---*/
+//			Wm_plus[iPoin][kPoin] = exp(a) - konst; // This is wm_plus evaluated at the wall
+//			B[iPoin][kPoin] = b;
+//
+////			// Uncomment if debug needed
+////			if (rank == MASTER_NODE)
+////				cout << "B = " << B << ", Wm_plus[" << iPoin << "][" << kPoin << "]= " << Wm_plus[iPoin][kPoin] << endl;
+//
+//			/*--- Solve for sigma_a , and sigma_b. ---*/
+////			siga = sqrt((1.0+sx*sx/(ss*st2))/ss);
+////			sigb = sqrt(1.0/st2);
+////
+////			/*--- Calculate Chi squared ---*/
+////			for (jPoin=0;jPoin<nPoin_y;jPoin++) {chi2 += (y[jPoin]-a-b*x[jPoin]) * (y[jPoin]-a-b*x[jPoin]);}
+////
+////			/*--- For unweighted data evaluate typical sig using chi2, and adjust the standard deviations ---*/
+////			if (nPoin_y > 2) { sigdat=sqrt(chi2/(nPoin_y-2)); }
+////			siga *= sigdat;
+////			sigb *= sigdat;
+//
+//		}
+//	}
+//
+//}
+
 void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2double ***x_pos, unsigned long nPoin_x, unsigned long nPoin_y,
-		                        unsigned long nPoin_z, su2double **Wm_plus, su2double **x_at_wall) {
+		                        unsigned long nPoin_z, su2double **Wm_plus, su2double **x_at_wall, su2double **B, unsigned long ***peaks) {
 
 	/*--- Main code from "Numerical Recipes: The Art of Scientific Computing, Third Edition in C++, pages 781-785" ---*/
 
 	unsigned long iPoin, jPoin, kPoin;
 	su2double ss, sx=0., sy=0., st2=0., t, sxoss;
-	su2double a, b=0.0;
+	su2double a, b;
 	su2double siga, sigb, chi2, q, sigdat;
-	su2double *x, *y;
-	su2double B;
+	su2double *x, *y, *xx, *yy;
+	unsigned long npoints_same_sign, max_idx, sig_change_idx, konst, npoint;
+	su2double count;
 
-	su2double konst = 100.00;
+	konst = 1; //HARDCODED
+	npoint = 6; //HARDCODED
 
-	x = new su2double[nPoin_y];
-	y = new su2double[nPoin_y];
+	x = new su2double[npoint];
+	y = new su2double[npoint];
 
-	for (iPoin = 0; iPoin < nPoin_x; iPoin++){		// loop over each streamwise location
-		for (kPoin = 0; kPoin < nPoin_z; kPoin++){	// loop over each slice
+	xx = new su2double[2];
+	yy = new su2double[2];
 
-			// Store x-coord at (closest mesh point to) the wall (jPoin=0 -> furthest from the wall; jPoin=nPoin_y-1 -> closest to the wall).
+	for (kPoin = 0; kPoin < nPoin_z; kPoin++){		// loop over each streamwise location
+		for (iPoin = 0; iPoin < nPoin_x; iPoin++){	// loop over each slice
+
+			// Store x-coord at (closest mesh point to) the wall (jPoin=0 -> farthest from the wall; jPoin=nPoin_y-1 -> closest to the wall).
 			x_at_wall[iPoin][kPoin] = x_pos[iPoin][nPoin_y-1][kPoin];
 
-			/*--- Start with fitting ---*/
-			sx=0.0; sy=0.0; st2=0.0; b=0.0;
+			//number of points with the same wm_plus sign as the inflection point:
+			max_idx = peaks[iPoin][1][kPoin] + konst;
+			sig_change_idx = peaks[iPoin][2][kPoin];
+			npoints_same_sign = max_idx - sig_change_idx;
 
-			/*--- Transform wm+ = Wm*exp(B*y+) into a linear form log(wm+) = log(Wm+) + B*y+;
-			 * i.e. y = a + bx, where a = log(Wm+), b = B, y = log(wm+), x = y+ ---*/
-			for (jPoin=0; jPoin<nPoin_y; jPoin++) {
-				x[jPoin] = y_plus[iPoin][jPoin][kPoin];
-				y[jPoin] = log(wm_plus[iPoin][jPoin][kPoin] + konst);
-			}
+//			if (kPoin == 0){
+//				cout << "max_idx = " << max_idx << ", sig_change_idx = " << sig_change_idx << ", npoints_same_sign = " << npoints_same_sign << endl;
+//			}
 
-			/*--- Accumulate sums without weights. ---*/
-			for (jPoin=0; jPoin<nPoin_y; jPoin++) {
-				sx += x[jPoin];
-				sy += y[jPoin];
-			}
-			ss = nPoin_y;
-			sxoss = sx/ss;
+			 if (npoints_same_sign >= npoint){ //linear fitting of an exponential
 
-			for (jPoin=0; jPoin<nPoin_y; jPoin++) {
-				t=x[jPoin]-sxoss;
-				st2 += t*t;
-				b += t*y[jPoin];
-			}
+				/*--- Start with fitting ---*/
+				sx=0.0; sy=0.0; st2=0.0;
+				b=0.0;
 
-			/*--- Solve for a, b ---*/
-			b /= st2;
-			a = (sy-sx*b)/ss;
+				/*--- Transform wm+ = Wm*exp(B*y+) into a linear form log(wm+) = log(Wm+) + B*y+;
+				 * i.e. y = a + bx, where y = log(wm+), a = log(Wm+), b = B, x = y+ ---*/
+				for (jPoin=0; jPoin<npoint; jPoin++) {
+					x[jPoin] = y_plus[iPoin][max_idx-npoint+jPoin][kPoin];
+					y[jPoin] = log(abs(wm_plus[iPoin][max_idx-npoint+jPoin][kPoin]));
+				}
 
-			/*---Compute Wm+ and B ---*/
-			Wm_plus[iPoin][kPoin] = exp(a) - konst; // This is wm_plus evaluated at the wall
-			B = b;
+				/*--- Accumulate sums without weights. ---*/
+				for (jPoin=0; jPoin<npoint; jPoin++) {
+					sx += x[jPoin];
+					sy += y[jPoin];
+				}
+				ss = npoint;
+				sxoss = sx/ss;
 
-//			// Uncomment if debug needed
-//			if (rank == MASTER_NODE)
-//				cout << "B = " << B << ", Wm_plus[" << iPoin << "][" << kPoin << "]= " << Wm_plus[iPoin][kPoin] << endl;
+				for (jPoin=0; jPoin<npoint; jPoin++) {
+					t = x[jPoin]-sxoss;
+					st2 += t*t;
+					b += t*y[jPoin];
+				}
 
-			/*--- Solve for sigma_a , and sigma_b. ---*/
-//			siga = sqrt((1.0+sx*sx/(ss*st2))/ss);
-//			sigb = sqrt(1.0/st2);
+				/*--- Solve for a, b ---*/
+				b /= st2;
+				a = (sy-sx*b)/ss;
+
+				/*---Compute Wm+ and B ---*/
+				if (peaks[iPoin][0][kPoin] == 1){ 	//if +ve wm_plus at inflection point
+					Wm_plus[iPoin][kPoin] = exp(a); // This is wm_plus evaluated at the wall
+					B[iPoin][kPoin] = b;
+				}
+				else{								//if -ve wm_plus at inflection point
+					Wm_plus[iPoin][kPoin] = -1.0 * exp(a); // This is wm_plus evaluated at the wall
+					B[iPoin][kPoin] = b;
+				}
+
+			 }
+
+			 else { // linear fitting of a line
+
+				/*--- Start with fitting ---*/
+				sx=0.0; sy=0.0; st2=0.0;
+				b=0.0;
+
+//				if (max_idx >= npoint){ // if there are enough points above the inflection point -> fit a line between inflection point and point npoint above the inflection point
+//					xx[0] = y_plus[iPoin][max_idx-konst-npoint+1][kPoin];
+//					xx[1] = y_plus[iPoin][max_idx-konst][kPoin];
 //
-//			/*--- Calculate Chi squared ---*/
-//			for (jPoin=0;jPoin<nPoin_y;jPoin++) {chi2 += (y[jPoin]-a-b*x[jPoin]) * (y[jPoin]-a-b*x[jPoin]);}
-//
-//			/*--- For unweighted data evaluate typical sig using chi2, and adjust the standard deviations ---*/
-//			if (nPoin_y > 2) { sigdat=sqrt(chi2/(nPoin_y-2)); }
-//			siga *= sigdat;
-//			sigb *= sigdat;
+//					yy[0] = wm_plus[iPoin][max_idx-konst-npoint+1][kPoin];
+//					yy[1] = wm_plus[iPoin][max_idx-konst][kPoin];
+//				}
+//				else{					// fit a line between inflection point and point immediately above it
+				xx[0] = y_plus[iPoin][max_idx-konst-1][kPoin];
+				xx[1] = y_plus[iPoin][max_idx-konst][kPoin];
 
+				yy[0] = wm_plus[iPoin][max_idx-konst-1][kPoin];
+				yy[1] = wm_plus[iPoin][max_idx-konst][kPoin];
+//				}
+
+				/*--- Accumulate sums without weights. ---*/
+				count = 0;
+				for (jPoin=0; jPoin<2; jPoin++) {
+					sx += xx[jPoin];
+					sy += yy[jPoin];
+					count++;
+				}
+				ss = count;
+				sxoss = sx/ss;
+
+				for (jPoin=0; jPoin<2; jPoin++) {
+					t = xx[jPoin]-sxoss;
+					st2 += t*t;
+					b += t*yy[jPoin];
+				}
+
+				/*--- Solve for a, b ---*/
+				b /= st2;
+				a = (sy-sx*b)/ss;
+
+				/*---Compute Wm+ and B ---*/
+				Wm_plus[iPoin][kPoin] = a; // This is wm_plus evaluated at the wall
+				B[iPoin][kPoin] = b;
+			 }
 		}
 	}
 
@@ -1979,7 +2169,7 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
 		mx_pos = 0;
 		mn_pos = 0;
 
-		/*--- initialize peaks matrix to zero ---*/
+		/*--- initialize peak matrix to zero ---*/
 		for(iPoin = 1; iPoin < nPoin_x; ++iPoin){
 			peaks[iPoin][kPoin] = 0;
 			x_loc_peaks[iPoin][kPoin] = 0;
@@ -2048,6 +2238,123 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
 
 }
 
+void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data */
+		                                   unsigned long nPoin_x,				/* row count of data */
+										   unsigned long nPoin_y,
+										   unsigned long nPoin_z,
+										   su2double delta,						/* delta used for distinguishing peaks */
+										   unsigned long ***peaks){
+
+	/*--- Main code from: https://github.com/xuphys/peakdetect/blob/master/peakdetect.c ---*/
+
+    unsigned long iPoin, jPoin, kPoin;
+    su2double  mx, mn;
+    unsigned long mx_pos;
+    unsigned long mn_pos;
+    unsigned short is_detecting_pk; // start detecting local peaks
+
+    /*--- Loop over all slices ---*/
+    for (kPoin=0; kPoin < nPoin_z; kPoin++){
+    	for (iPoin=0; iPoin < nPoin_x; iPoin++){
+
+			/*--- Initialize max and min of the input data ---*/
+			mx = data[iPoin][0][kPoin];
+			mn = data[iPoin][0][kPoin];
+			is_detecting_pk = 1; // start detecting local peaks
+			mx_pos = 0;
+			mn_pos = 0;
+
+			/*--- Loop over the input data ---*/
+			for(jPoin = 1; jPoin < nPoin_y; ++jPoin){
+
+				if(data[iPoin][jPoin][kPoin] > mx){
+					mx_pos = jPoin;
+					mx = data[iPoin][jPoin][kPoin];
+				}
+
+				if(data[iPoin][jPoin][kPoin] < mn){
+					mn_pos = jPoin;
+					mn = data[iPoin][jPoin][kPoin];
+				}
+
+				if(is_detecting_pk && data[iPoin][jPoin][kPoin] < mx - delta){
+
+					is_detecting_pk = 0;
+					jPoin = mx_pos - 1;
+
+					mn = data[iPoin][mx_pos][kPoin];
+					mn_pos = mx_pos;
+				}
+				else if((!is_detecting_pk) &&  data[iPoin][jPoin][kPoin] > mn + delta){
+
+					is_detecting_pk = 1;
+					jPoin = mn_pos - 1;
+
+					mx = data[iPoin][mn_pos][kPoin];
+					mx_pos = mn_pos;
+				}
+			}
+
+			if (mn_pos > mx_pos){
+				peaks[iPoin][0][kPoin] = 1;
+				peaks[iPoin][1][kPoin] = mx_pos;
+			}
+			else{
+				peaks[iPoin][0][kPoin] = 0;
+				peaks[iPoin][1][kPoin] = mn_pos;
+			}
+    	}
+    }
+
+//	/*--- Uncomment if need to debug ---*/
+//	if (rank == MASTER_NODE){
+//		for (iPoin = 0; iPoin<nPoin_x; iPoin++)
+//				cout << peaks[iPoin][1][5] << ", " ;
+//	}
+//	cout << endl;
+
+}
+
+void CNSSolver::Find_change_of_sign(su2double ***wm_plus, 					/* input data */
+		                                   unsigned long nPoin_x,
+										   unsigned long nPoin_y,
+										   unsigned long nPoin_z,
+										   unsigned long ***peaks){					/*  location of closest inflection point to the wall */
+
+	unsigned long iPoin, jPoin, kPoin;
+
+	for(kPoin=0; kPoin<nPoin_z; ++kPoin){
+		for(iPoin=0; iPoin<nPoin_x; ++iPoin){
+
+			if ( peaks[iPoin][0][kPoin] == 1 ){ // if wm_plus at inflection point is +ve, look for first -ve wm_plus
+				for(jPoin=peaks[iPoin][1][kPoin]; jPoin>0; jPoin--){ //Loop backwards (because wall is at jPoin = nPoin_y, start from inflection point.
+					if ( wm_plus[iPoin][jPoin][kPoin] < 0){
+						peaks[iPoin][2][kPoin] = jPoin;
+						break;
+					}
+					else {
+						peaks[iPoin][2][kPoin] = 0; // if there is no sign change, then  assign a default index of 0.
+					}
+				}
+			}
+
+			else if ( peaks[iPoin][0][kPoin] == 0 ){ // if wm_plus at inflection point is -ve, look for first +ve wm_plus
+				for(jPoin=peaks[iPoin][1][kPoin]; jPoin>0; jPoin--){ //Loop backwards (because wall is at jPoin = nPoin_y, start from inflection point.
+					if ( wm_plus[iPoin][jPoin][kPoin] > 0){
+						peaks[iPoin][2][kPoin] = jPoin;
+						break;
+					}
+					else {
+						peaks[iPoin][2][kPoin] = 0; // if there is no sign change, then  assign a default index of 0.
+					}
+				}
+			}
+
+		}
+	}
+
+}
+
 unsigned long CNSSolver::LinearInt_locate(su2double *xx, unsigned long n, su2double x){
 
 	/*--- Main code from "Numerical Recipes: The Art of Scientific Computing, Third Edition in C++, pg. 115" ---*/
@@ -2086,7 +2393,7 @@ unsigned long CNSSolver::LinearInt_locate(su2double *xx, unsigned long n, su2dou
 
 }
 
-su2double CNSSolver::LinearInt_bilininterp(su2double *xx, unsigned long nx, su2double *yy, unsigned long ny, su2double **zz, su2double *xint){
+su2double CNSSolver::BilinearInterp(su2double *xx, unsigned long nx, su2double *yy, unsigned long ny, su2double **zz, su2double *xint){
 
 	/*--- Main code from "Numerical Recipes: The Art of Scientific Computing, Third Edition in C++, pg. 132-134" ---*/
 
@@ -2119,5 +2426,82 @@ su2double CNSSolver::LinearInt_bilininterp(su2double *xx, unsigned long nx, su2d
 	val = (1.0 - t)*(1.0 - u)*zz[i][j] + t*(1.0 - u)*zz[i+1][j]	+ (1.0 - t)*u*zz[i][j+1] + t*u*zz[i+1][j+1];
 
 	return val;
+
+}
+
+su2double CNSSolver::LinearInterp(su2double *xx, unsigned long nx, su2double *yy, su2double xint){
+
+	unsigned long i;
+
+	/*--- Find the interplating bracket---*/
+	i = LinearInt_locate(xx, nx, xint);
+
+	/*--- Interpolate ---*/
+	if (xx[i] == xx[i+1])
+		return yy[i];
+	else
+		return yy[i] + ((xint-xx[i]) / (xx[i+1]-xx[i])) * (yy[i+1]-yy[i]);
+
+}
+
+su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
+
+	bool mirrored = false;
+	su2double Rsearch, Re_tau_in, R_new, err, A, B;
+	su2double *a, *b, *R_in;
+	unsigned long ii;
+
+	a = new su2double [6];
+	b = new su2double [6];
+	R_in = new su2double [6];
+
+	if (R > 0){
+		R = -1.0 * R;
+		mirrored = true;
+	}
+
+	Rsearch   = -1.0 * R/100;
+	Re_tau_in = 200; //why ???
+
+	a[0] = 0.8991; b[0] = -0.0839;
+	a[1] = 0.7676; b[1] = -0.09349;
+	a[2] = 0.6107; b[2] = -0.1022;
+	a[3] = 0.43;   b[3] = -0.1104;
+	a[4] = 0.2263; b[4] = -0.1182;
+	a[5] = 0;      b[5] = 0;
+
+	for (ii=0; ii<6; ii++){
+		R_in[ii] = a[ii] * pow(Re_tau_in, b[ii]);
+//		if (rank == MASTER_NODE){
+//			cout << R_in[ii] << " ";
+//		}
+	}
+
+//	Rsearch = 0.3; //only for debugging purposes
+//	Re_tau = 1.0e4; // only for debugging purposes
+
+	/*--- Interpolate ---*/
+	A = LinearInterp(R_in, 6, a, Rsearch);
+	B = LinearInterp(R_in, 6, b, Rsearch);
+
+	/*--- Compute friction drag reduction ---*/
+	R_new = A * pow(Re_tau, B);
+
+	if (rank == MASTER_NODE){
+		cout << "Rnew = " << R_new << endl;
+	}
+
+	/*--- Remove line offset if it exists ---*/
+	err = Rsearch - A * pow(Re_tau_in, B);
+	R_new += err;
+//	if (rank == MASTER_NODE){
+//		cout << "Rnew + err = " << R_new << endl;
+//	}
+
+	R_new *= -100;
+	if (mirrored)
+		R_new = -1.0 * R_new;
+
+	return R_new;
 
 }

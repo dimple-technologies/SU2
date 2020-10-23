@@ -61,6 +61,8 @@ private:
   StrainMag_Max,
   Omega_Max;             /*!< \brief Maximum Strain Rate magnitude and Omega. */
 
+  su2double *u_tau = nullptr;
+
   /*!
    * \brief A virtual member.
    * \param[in] geometry - Geometrical definition.
@@ -548,7 +550,7 @@ public:
                      CSolver** solver_container,
                      CConfig* config) override;
 
-  void Compute_ViscCD_StokesMethod(CGeometry *geometry,
+  su2double Compute_ViscCD_StokesMethod(CGeometry *geometry,
 		  	  	  	  	  	  	   CConfig *config);
 
   void Fit_exponential(su2double ***wm_plus,
@@ -558,7 +560,9 @@ public:
 					   unsigned long nPoin_y,
 					   unsigned long nPoin_z,
 					   su2double **Wm_plus,
-					   su2double **x_at_wall);
+					   su2double **x_at_wall,
+					   su2double **B,
+					   unsigned long ***peaks);
 
   void Find_peaks_and_throughs(su2double **data,
 		  	  	  	  	  	  	  su2double **x_at_wall,
@@ -569,9 +573,30 @@ public:
 								  su2double **x_loc_peaks,
 								  su2double **amplitude_peaks);
 
+  void Find_peak_closest_to_wall(su2double ***data,
+  		                                   unsigned long nPoin_x,
+  										   unsigned long nPoin_y,
+										   unsigned long nPoin_z,
+  										   su2double delta,
+  										   unsigned long ***peaks);
+
+  void Find_change_of_sign(su2double ***wm_plus,
+  		                                   unsigned long nPoin_x,
+  										   unsigned long nPoin_y,
+  										   unsigned long nPoin_z,
+  										   unsigned long ***peaks);
+
   unsigned long LinearInt_locate(su2double *xx, unsigned long n, su2double x);
 
-  su2double LinearInt_bilininterp(su2double *xx, unsigned long nx, su2double *yy, unsigned long ny, su2double **zz, su2double *xint);
+  su2double BilinearInterp(su2double *xx, unsigned long nx, su2double *yy, unsigned long ny, su2double **zz, su2double *xint);
+
+  su2double LinearInterp(su2double *xx, unsigned long nx, su2double *yy, su2double xint);
+
+  su2double ReynoldsScalingRicco(su2double R, su2double Re_tau);
+
+  inline su2double GetFrictionVel(unsigned long iPoint)  { return u_tau[iPoint]; }
+
+  inline void SetFrictionVel(unsigned long iPoint, su2double val_frictionvel)  { u_tau[iPoint] = val_frictionvel; }
 
 };
 
