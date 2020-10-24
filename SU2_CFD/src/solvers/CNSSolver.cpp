@@ -1710,7 +1710,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
 		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
 			for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
-				y_plus[iPoin][jPoin][kPoin] *= u_tau[iPoin][kPoin] ; // wall distance
+				y_plus[iPoin][jPoin][kPoin] *= u_tau[iPoin][kPoin]; // wall distance
 				wm_plus[iPoin][jPoin][kPoin] /= u_tau[iPoin][kPoin]; // spanwise velocity (w)
 			}
 		}
@@ -1744,12 +1744,13 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	/*--- Find index of closest point to inflection point where wm_plus changes sign ---*/
 	Find_change_of_sign(wm_plus, nPoin_x, nPoin_y, nPoin_z, peaks);
 
+//	//FOR VALIDATION ONLY
 //	kPoin = 45;
 //
 //	ofstream myfile;
 //	/*--- Uncomment if need to debug ---*/
 //	if (rank == MASTER_NODE){
-//		myfile.open ("tests/peaks.dat", ios::out);
+//		myfile.open ("validation_fit_exponential/peaks.dat", ios::out);
 //		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
 //			myfile << peaks[iPoin][1][kPoin] << ", ";
 //		}
@@ -1759,7 +1760,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //
 //	/*--- Uncomment if need to debug ---*/
 //	if (rank == MASTER_NODE){
-//		myfile.open ("tests/sign_change.dat", ios::out);
+//		myfile.open ("validation_fit_exponential/sign_change.dat", ios::out);
 //		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
 //				myfile << peaks[iPoin][2][kPoin] << ", " ;
 //		}
@@ -1768,7 +1769,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //	}
 //
 //	if (rank == MASTER_NODE){
-//		myfile.open ("tests/y_plus.dat", ios::out);
+//		myfile.open ("validation_fit_exponential/y_plus.dat", ios::out);
 //		for (iPoin=0; iPoin < nPoin_x; iPoin++){
 //			for (jPoin=0; jPoin < nPoin_y; jPoin++){
 //				myfile << y_plus[iPoin][jPoin][kPoin] << ", ";
@@ -1778,7 +1779,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //	}
 //
 //	if (rank == MASTER_NODE){
-//		myfile.open ("tests/wm_plus.dat", ios::out);
+//		myfile.open ("validation_fit_exponential/wm_plus.dat", ios::out);
 //		for (iPoin=0; iPoin < nPoin_x; iPoin++){
 //			for (jPoin=0; jPoin < nPoin_y; jPoin++){
 //				myfile << wm_plus[iPoin][jPoin][kPoin] << ", ";
@@ -1786,151 +1787,226 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //		}
 //		myfile.close();
 //	}
+//  //END VALIDATION
 
 	/*--- Compute equivalent spanwise oscialltion at the wall ---*/
 	Fit_exponential(wm_plus, y_plus, x_pos, nPoin_x, nPoin_y, nPoin_z, Wm_plus, x_at_wall, B, peaks);
 
-//	// VERIFICATION: For each slice, for each x, plot the actual wm_plus and the fitted exponential. Visually check they make sense.
+//	//FOR VALIDATION ONLY: For each slice, for each x, plot the actual wm_plus and the fitted exponential. Visually check they make sense.
 
 //	for (iPoin=0; iPoin < nPoin_x; iPoin++){
 //		cout << "(" << iPoin << "): Aint = " << Wm_plus[iPoin][kPoin] << " , Bint = " << B[iPoin][kPoin] << endl;;
 //	}
 //	cout << endl;
+//  //END VALIDATION
 
-//	/*--- For each slice, find peaks and throughs of the equivalent spanwise oscillation at the wall (Wm_plus) ---*/
-//	su2double **peaks, **x_loc_peaks,  **amplitude_peaks;
-//    peaks = new su2double*[nPoin_x];
-//    x_loc_peaks = new su2double*[nPoin_x];
-//    amplitude_peaks = new su2double*[nPoin_x];
-//    for (iPoin=0; iPoin < nPoin_x; iPoin++){
-//    	peaks[iPoin] = new su2double [nPoin_z];
-//    	x_loc_peaks[iPoin] = new su2double [nPoin_z];
-//    	amplitude_peaks[iPoin] = new su2double [nPoin_z];
-//    }
-//
-//    su2double delta = 5e-2; //HARDCODED
-//	Find_peaks_and_throughs(Wm_plus, x_at_wall, nPoin_x, nPoin_z, delta, peaks, x_loc_peaks, amplitude_peaks);
-//
-//	// VERIFICATION: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
-//
-//	/*--- Initialize variables for next routine ---*/
-//	su2double *avg_amplitude, *avg_wavelength, *avg_period, *avg_utau;
-//	avg_amplitude = new su2double [nPoin_z];
-//	avg_wavelength = new su2double [nPoin_z];
-//	avg_period = new su2double [nPoin_z];
-//	avg_utau = new su2double [nPoin_z];
-//	unsigned long count;
-//	unsigned long count_peaks, count_throughs;
-//	unsigned long jj, kk;
-//	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
-//	su2double tot_avg_amplitude, tot_avg_period;
-//	tot_avg_amplitude = 0;
-//	tot_avg_period = 0;
-//
-//	/*---Compute average wave amplitude ---*/
-//	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
-//		avg_amplitude[kPoin] = 0; // initialize to zero
-//		count = 0;
-//		for (iPoin = 0; iPoin < nPoin_x; iPoin++){
-//			if (amplitude_peaks[iPoin][kPoin] != 0){
-//				avg_amplitude[kPoin] += abs(amplitude_peaks[iPoin][kPoin]);
-//				count += 1; //count the number of peaks/throughs
-//			}
-//		}
-//		avg_amplitude[kPoin] /= count;			  // average amplitude of the slice
-//		tot_avg_amplitude += avg_amplitude[kPoin]; // average amplitude of the entire test case (Wm+)
-//	}
-//	tot_avg_amplitude /= nPoin_z;
-//
-//	// VERIFICATION: For each slice, compare avg_amplitude with the one computed in Python. In general, check the order of magnitude makes sense.
-//	// VERIFICATION: verify routine works using synthetic data.
-//
-//	/*---Compute average wavelength :  avg_wavelength = (max(x_loc) - min(x_loc))/number of waves---*/
-//	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
-//		avg_wavelength[kPoin] = 0; // initialize to zero
-//		avg_utau[kPoin] = 0;
-//		count_peaks = 0; count_throughs = 0;
-//		jj=0; kk=0;
-//
-//		for (iPoin = nPoin_x-1; iPoin > 0; iPoin--){ //traverse array from the back
-//
-//			if (peaks[iPoin][kPoin] == 1){ // check whether it is a peak (or a through)
-//				if (jj == 0){
-//					max_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate max(x_loc) of a peak
-//					jj++;
-//				}
-//				else{
-//					min_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate temporary x-loc of a peak; after the array has been completely traversed, it will be min(x_loc)
-//					count_peaks += 1;
-//				}
-//			}
-//
-//			if (peaks[iPoin][kPoin] == -1){
-//				if (kk == 0){
-//					max_loc_through = x_loc_peaks[iPoin][kPoin];
-//					kk++;
-//				}
-//				else{
-//					min_loc_through = x_loc_peaks[iPoin][kPoin];
-//					count_throughs += 1;
-//				}
-//			}
-//
-//			avg_utau[kPoin] += u_tau[iPoin][kPoin];
-//
-//		}
-//		avg_utau[kPoin] /= nPoin_x;
-//		avg_wavelength[kPoin] = (max_loc_peak-min_loc_peak)/count_peaks + (max_loc_through - min_loc_through)/count_throughs;
-//		avg_period[kPoin] /= Velocity_Inf[0]; // transform from wavelength (m) to period (s)
-//		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu; //normalize
-//		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
-//	}
-//	tot_avg_period /= nPoin_z;
-//
-//	// VERIFICATION: For each slice, compare avg_period with the one computed in Python. In general, check the order of magnitude makes sense.
-//	// VERIFICATION: verify routine works using synthetic data.
-//
-//	/*--- Compute R-factor by interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
-//	/*--- R represents the % friction drag reduction compared to a flat plate ---*/
-//
-//	su2double *xx, *yy, **zz, *xint;
-//
-//	xx = new su2double [config->Get_nPoinx_Ricco()];
-//	yy = new su2double [config->Get_nPoiny_Ricco()];
-//	zz = new su2double* [config->Get_nPoinx_Ricco()];
-//	xint = new su2double [2];
-//
-//	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++){
-//		xx[iPoin] = config->Get_RiccoField(0, iPoin, 0);			// only one row is necessary for bilinear interp on an *ordered grid* of points.
-//		zz[iPoin] = new su2double [config->Get_nPoiny_Ricco()];
-//		for (jPoin = 0; jPoin < config->Get_nPoiny_Ricco(); jPoin++){
-//			yy[jPoin] = config->Get_RiccoField(jPoin, 0, 1);	// only one column is necessary for bilinear interp on an *ordered grid* of points.
-//			zz[iPoin][jPoin] = config->Get_RiccoField(iPoin, jPoin, 2);
-//		}
-//	}
-//
-//
-//	xint[0] = tot_avg_period;
-//	xint[1] = tot_avg_amplitude;
-//
-//
-//	su2double R;
-//	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
-//
-//	// VERIFICATION: verify routine works using synthetic data.
-//
-//	su2double Re_tau_flat_plate = 1.0; //placeholder
-//	R = ReynoldsScalingRicco(R, Re_tau_flat_plate);
-//
-//	// VERIFICATION: verify routine works using synthetic data.
-//
-//	// VERIFICATION: check the order of magnitude of R makes sense.
-//
-//	su2double flat_plate_viscous_drag = 1.0; //placeholder
-//
-//	return R * flat_plate_viscous_drag;
+	/*--- For each slice, find peaks and throughs of the equivalent spanwise oscillation at the wall (Wm_plus) ---*/
+	su2double **peaks_1, **x_loc_peaks,  **amplitude_peaks;
+    peaks_1 = new su2double*[nPoin_x];
+    x_loc_peaks = new su2double*[nPoin_x];
+    amplitude_peaks = new su2double*[nPoin_x];
+    for (iPoin=0; iPoin < nPoin_x; iPoin++){
+    	peaks_1[iPoin] = new su2double [nPoin_z];
+    	x_loc_peaks[iPoin] = new su2double [nPoin_z];
+    	amplitude_peaks[iPoin] = new su2double [nPoin_z];
+    }
 
-	return 1.0;
+    su2double delta = 0.15; //HARDCODED
+	Find_peaks_and_throughs(Wm_plus, x_at_wall, nPoin_x, nPoin_z, delta, peaks_1, x_loc_peaks, amplitude_peaks);
+
+//	//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
+//
+//	ofstream myfile;
+//	/*--- Uncomment if need to debug ---*/
+//	if (rank == MASTER_NODE){
+//		myfile.open ("validation_find_peaks/peaks_1.dat", ios::out);
+//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//			for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+//				myfile << peaks_1[iPoin][kPoin] << ", ";
+//			}
+//			myfile << peaks_1[nPoin_x-1][kPoin] << endl;
+//		}
+//		myfile.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile.open ("validation_find_peaks/x_at_wall.dat", ios::out);
+//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
+//				myfile << x_at_wall[iPoin][kPoin] << ", ";
+//			}
+//			myfile << x_at_wall[nPoin_x-1][kPoin] << endl;
+//		}
+//		myfile.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile.open ("validation_find_peaks/Wm_plus.dat", ios::out);
+//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
+//				myfile << Wm_plus[iPoin][kPoin] << ", ";
+//			}
+//			myfile << Wm_plus[nPoin_x-1][kPoin] << endl;
+//		}
+//		myfile.close();
+//	}
+//	//END VALIDATION
+
+	/*--- Initialize variables for next routine ---*/
+	su2double *avg_amplitude, *avg_wavelength, *avg_period, *avg_utau;
+	avg_amplitude = new su2double [nPoin_z];
+	avg_wavelength = new su2double [nPoin_z];
+	avg_period = new su2double [nPoin_z];
+	avg_utau = new su2double [nPoin_z];
+	unsigned long count;
+	unsigned long count_peaks, count_throughs;
+	unsigned long jj, kk;
+	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
+	su2double tot_avg_amplitude, tot_avg_period;
+	tot_avg_amplitude = 0.0;
+	tot_avg_period = 0.0;
+	su2double nu_inf = Viscosity_Inf / Density_Inf;
+
+	/*---Compute average wave amplitude ---*/
+	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
+		avg_amplitude[kPoin] = 0; // initialize to zero
+		count = 0;
+		for (iPoin = 0; iPoin < nPoin_x; iPoin++){
+			if (amplitude_peaks[iPoin][kPoin] != 0){
+				avg_amplitude[kPoin] += abs(amplitude_peaks[iPoin][kPoin]);
+				count += 1; //count the number of peaks/troughs
+			}
+		}
+		avg_amplitude[kPoin] /= count;			   // average amplitude of the slice
+		tot_avg_amplitude += avg_amplitude[kPoin]; // average amplitude of the entire test case (Wm+)
+	}
+	tot_avg_amplitude /= nPoin_z;
+
+//	//FOR VALIDATION ONLY
+//	ofstream myfile;
+//	if (rank == MASTER_NODE){
+//		myfile.open ("validation_averaging/amplitude_peaks.dat", ios::out);
+//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
+//				myfile << amplitude_peaks[iPoin][kPoin] << ", ";
+//			}
+//			myfile << amplitude_peaks[nPoin_x-1][kPoin] << endl;
+//		}
+//		myfile.close();
+//	}
+//	//END VALIDATION
+
+	/*---Compute average wavelength :  avg_wavelength = (max(x_loc) - min(x_loc))/number of waves---*/
+	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
+		avg_wavelength[kPoin] = 0; // initialize to zero
+		avg_utau[kPoin] = 0;
+		count_peaks = 0; count_throughs = 0;
+		jj=0; kk=0;
+
+		for (iPoin = 0; iPoin <nPoin_x; iPoin++){ //traverse array from the back
+
+			if (peaks_1[iPoin][kPoin] == 1){ // check whether it is a peak (or a through)
+				if (jj == 0){
+					min_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate min(x_loc) of a peak
+					count_peaks += 1;
+					jj++;
+				}
+				else{
+					max_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate temporary x_loc of a peak; after the array has been completely traversed, it will be max(x_loc))
+					count_peaks += 1;
+				}
+			}
+
+			if (peaks_1[iPoin][kPoin] == -1){
+				if (kk == 0){
+					min_loc_through = x_loc_peaks[iPoin][kPoin];
+					count_throughs += 1;
+					kk++;
+				}
+				else{
+					max_loc_through = x_loc_peaks[iPoin][kPoin];
+					count_throughs += 1;
+				}
+			}
+
+			avg_utau[kPoin] += u_tau[iPoin][kPoin];
+
+		}
+
+		avg_utau[kPoin] /= nPoin_x;
+		avg_wavelength[kPoin] = ( (max_loc_peak-min_loc_peak)/(count_peaks-1) + (max_loc_through - min_loc_through)/(count_throughs-1) ) / 2.0;
+		avg_period[kPoin] = avg_wavelength[kPoin] / Velocity_Inf[0]; // transform from wavelength (m) to period (s)
+		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu_inf; //normalize
+		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
+	}
+	tot_avg_period /= nPoin_z;
+
+//	//FOR VALIDATION ONLY
+//	ofstream myfile;
+//	if (rank == MASTER_NODE){
+//		myfile.open ("validation_averaging/x_loc_peaks.dat", ios::out);
+//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
+//				myfile << x_loc_peaks[iPoin][kPoin] << ", ";
+//			}
+//			myfile << x_loc_peaks[nPoin_x-1][kPoin] << endl;
+//		}
+//		myfile.close();
+//	}
+//	//END VALIDATION
+//
+//	//FOR VALIDATION ONLY
+//	if (rank == MASTER_NODE){
+//		myfile.open ("validation_averaging/peaks_1.dat", ios::out);
+//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
+//				myfile << peaks_1[iPoin][kPoin] << ", ";
+//			}
+//			myfile << peaks_1[nPoin_x-1][kPoin] << endl;
+//		}
+//		myfile.close();
+//	}
+//	//END VALIDATION
+
+	/*--- Compute R-factor by interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
+	/*--- R represents the % friction drag reduction compared to a flat plate ---*/
+
+	su2double *xx, *yy, **zz, *xint;
+	su2double R;
+
+	xx = new su2double [config->Get_nPoinx_Ricco()];
+	yy = new su2double [config->Get_nPoiny_Ricco()];
+	zz = new su2double* [config->Get_nPoinx_Ricco()];
+	xint = new su2double [2];
+
+	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++){
+		xx[iPoin] = config->Get_RiccoField(0, iPoin, 0);			// only one row is necessary for bilinear interp on an *ordered grid* of points.
+		zz[iPoin] = new su2double [config->Get_nPoiny_Ricco()];
+		for (jPoin = 0; jPoin < config->Get_nPoiny_Ricco(); jPoin++){
+			yy[jPoin] = config->Get_RiccoField(jPoin, 0, 1);	// only one column is necessary for bilinear interp on an *ordered grid* of points.
+			zz[iPoin][jPoin] = config->Get_RiccoField(jPoin, iPoin, 2);
+		}
+	}
+
+	xint[0] = tot_avg_period;
+	xint[1] = tot_avg_amplitude;
+
+	if (isnan(xint[0]) || isnan(xint[1])){
+		throw("Error:Either T+ or Wm+ are Nan!!!");
+	}
+
+	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
+
+//	//FOR VALIDATION ONLY: verify routine works using synthetic data.
+//	cout << "T+ = " << xint[0] << ", Wm+ = " << xint[1] << ", R = " << R << endl;
+//	//END VALIDATION
+
+	su2double Re_tau_flat_plate = 1e3; //placeholder
+	su2double flat_plate_viscous_drag = 1.0; //placeholder
+
+	R = ReynoldsScalingRicco(R, Re_tau_flat_plate);
+
+	return R * flat_plate_viscous_drag;
 
 }
 
@@ -2158,6 +2234,7 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
     unsigned long mx_pos;
     unsigned long mn_pos;
     unsigned short is_detecting_pk; // start detecting local peaks
+    su2double Wm_max;
 
     /*--- Loop over all slices ---*/
     for (kPoin=0; kPoin < nPoin_z; kPoin++){
@@ -2170,10 +2247,12 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
 		mn_pos = 0;
 
 		/*--- initialize peak matrix to zero ---*/
+		Wm_max = abs(data[0][kPoin]);
 		for(iPoin = 1; iPoin < nPoin_x; ++iPoin){
 			peaks[iPoin][kPoin] = 0;
 			x_loc_peaks[iPoin][kPoin] = 0;
 			amplitude_peaks[iPoin][kPoin] = 0;
+			Wm_max = max(abs(data[iPoin][kPoin]), Wm_max);
 		}
 
 		/*--- Loop over the input data ---*/
@@ -2189,7 +2268,7 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
 				mn = data[iPoin][kPoin];
 			}
 
-			if(is_detecting_pk && data[iPoin][kPoin] < mx - delta){
+			if(is_detecting_pk && data[iPoin][kPoin] < mx - delta*Wm_max){
 
 				peaks[mx_pos][kPoin] = 1;
 				x_loc_peaks[mx_pos][kPoin] = x_at_wall[mx_pos][kPoin];
@@ -2201,7 +2280,7 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
 				mn = data[mx_pos][kPoin];
 				mn_pos = mx_pos;
 			}
-			else if((!is_detecting_pk) &&  data[iPoin][kPoin] > mn + delta){
+			else if((!is_detecting_pk) &&  data[iPoin][kPoin] > mn + delta*Wm_max){
 
 				peaks[mn_pos][kPoin] = -1;
 				x_loc_peaks[mn_pos][kPoin] = x_at_wall[mn_pos][kPoin];
@@ -2446,6 +2525,8 @@ su2double CNSSolver::LinearInterp(su2double *xx, unsigned long nx, su2double *yy
 
 su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
 
+	/*--- Code based on original script by M. van Nesselrooij ---*/
+
 	bool mirrored = false;
 	su2double Rsearch, Re_tau_in, R_new, err, A, B;
 	su2double *a, *b, *R_in;
@@ -2461,7 +2542,7 @@ su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
 	}
 
 	Rsearch   = -1.0 * R/100;
-	Re_tau_in = 200; //why ???
+	Re_tau_in = 200; // why??? Ricco's data are at Re_tau = 200.
 
 	a[0] = 0.8991; b[0] = -0.0839;
 	a[1] = 0.7676; b[1] = -0.09349;
@@ -2472,13 +2553,7 @@ su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
 
 	for (ii=0; ii<6; ii++){
 		R_in[ii] = a[ii] * pow(Re_tau_in, b[ii]);
-//		if (rank == MASTER_NODE){
-//			cout << R_in[ii] << " ";
-//		}
 	}
-
-//	Rsearch = 0.3; //only for debugging purposes
-//	Re_tau = 1.0e4; // only for debugging purposes
 
 	/*--- Interpolate ---*/
 	A = LinearInterp(R_in, 6, a, Rsearch);
@@ -2494,9 +2569,6 @@ su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
 	/*--- Remove line offset if it exists ---*/
 	err = Rsearch - A * pow(Re_tau_in, B);
 	R_new += err;
-//	if (rank == MASTER_NODE){
-//		cout << "Rnew + err = " << R_new << endl;
-//	}
 
 	R_new *= -100;
 	if (mirrored)
