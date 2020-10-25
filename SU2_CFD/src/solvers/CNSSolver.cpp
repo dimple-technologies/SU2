@@ -112,7 +112,7 @@ SU2_MPI::Allreduce(&nPointLocal, &nPointGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, M
 nPointGlobal = nPointLocal; //Total number of points in the domain (no halo nodes considered)
 #endif
 
-  if (config->Get_boolsamplingLines() == true){
+  if (config->Get_BoolStokesDrag() == true){
 	  u_tau = new su2double[nPointGlobal];
   }
 
@@ -558,7 +558,7 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
         /*--- Compute y+ and non-dimensional velocity ---*/
 
         FrictionVel = sqrt(fabs(WallShearStress)/Density);
-        if (config->Get_boolsamplingLines() == true){
+        if (config->Get_BoolStokesDrag() == true){
         	SetFrictionVel(iPoint, FrictionVel);
         }
         YPlus[iMarker][iVertex] = WallDistMod*FrictionVel/(Viscosity/Density);
@@ -693,11 +693,6 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
     }
   }
 
-  if (config->Get_boolsamplingLines() == true){
-	  Compute_ViscCD_StokesMethod(geometry, config);
-//	  AllBoundViscCoeff.CD = TODO;
-  }
-
   /*--- Update some global coeffients ---*/
 
   AllBoundViscCoeff.CEff = AllBoundViscCoeff.CL / (AllBoundViscCoeff.CD + EPS);
@@ -803,6 +798,15 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
   TotalCoeff.CMerit       = AllBoundViscCoeff.CT / (AllBoundViscCoeff.CQ + EPS);
   Total_Heat         = AllBound_HF_Visc;
   Total_MaxHeat      = AllBound_MaxHF_Visc;
+
+  if (config->Get_BoolStokesDrag() == true){
+	  su2double delta_cd;
+	  delta_cd = Compute_ViscCD_StokesMethod(geometry, config); // The TOTAL viscous Cd reduction is computed by every processor (no need to sum them up).
+	  // Take only the value at the MASTER_NODE.
+	  if (rank == MASTER_NODE){
+		  TotalCoeff.CD += delta_cd; //add/subtract drag increase/reduction from viscous drag coefficient
+	  }
+  }
 
   /*--- Update the total coefficients per surface (note that all the nodes have the same value)---*/
 
@@ -1745,47 +1749,49 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	Find_change_of_sign(wm_plus, nPoin_x, nPoin_y, nPoin_z, peaks);
 
 //	//FOR VALIDATION ONLY
-//	kPoin = 45;
+//	kPoin = 37;
 //
-//	ofstream myfile;
+//	ofstream myfile1;
 //	/*--- Uncomment if need to debug ---*/
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_fit_exponential/peaks.dat", ios::out);
+//		myfile1.open ("1_validation_fit_exponential/peaks.dat", ios::out);
 //		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-//			myfile << peaks[iPoin][1][kPoin] << ", ";
+//			myfile1 << peaks[iPoin][1][kPoin] << ", ";
 //		}
-//		myfile << peaks[nPoin_x-1][1][kPoin] << endl;
-//		myfile.close();
+//		myfile1 << peaks[nPoin_x-1][1][kPoin] << endl;
+//		myfile1.close();
 //	}
 //
 //	/*--- Uncomment if need to debug ---*/
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_fit_exponential/sign_change.dat", ios::out);
+//		myfile1.open ("1_validation_fit_exponential/sign_change.dat", ios::out);
 //		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-//				myfile << peaks[iPoin][2][kPoin] << ", " ;
+//			myfile1 << peaks[iPoin][2][kPoin] << ", " ;
 //		}
-//		myfile << peaks[nPoin_x-1][2][kPoin] << endl;
-//		myfile.close();
+//		myfile1 << peaks[nPoin_x-1][2][kPoin] << endl;
+//		myfile1.close();
 //	}
 //
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_fit_exponential/y_plus.dat", ios::out);
+//		myfile1.open ("1_validation_fit_exponential/y_plus.dat", ios::out);
 //		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-//			for (jPoin=0; jPoin < nPoin_y; jPoin++){
-//				myfile << y_plus[iPoin][jPoin][kPoin] << ", ";
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
 //			}
+//			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile1.close();
 //	}
 //
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_fit_exponential/wm_plus.dat", ios::out);
+//		myfile1.open ("1_validation_fit_exponential/wm_plus.dat", ios::out);
 //		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-//			for (jPoin=0; jPoin < nPoin_y; jPoin++){
-//				myfile << wm_plus[iPoin][jPoin][kPoin] << ", ";
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << wm_plus[iPoin][jPoin][kPoin] << ", ";
 //			}
+//			myfile1 << wm_plus[iPoin][nPoin_y-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile1.close();
 //	}
 //  //END VALIDATION
 
@@ -1815,40 +1821,39 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	Find_peaks_and_throughs(Wm_plus, x_at_wall, nPoin_x, nPoin_z, delta, peaks_1, x_loc_peaks, amplitude_peaks);
 
 //	//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
-//
-//	ofstream myfile;
+//	ofstream myfile2;
 //	/*--- Uncomment if need to debug ---*/
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_find_peaks/peaks_1.dat", ios::out);
+//		myfile2.open ("2_validation_find_peaks/peaks_1.dat", ios::out);
 //		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
 //			for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-//				myfile << peaks_1[iPoin][kPoin] << ", ";
+//				myfile2 << peaks_1[iPoin][kPoin] << ", ";
 //			}
-//			myfile << peaks_1[nPoin_x-1][kPoin] << endl;
+//			myfile2 << peaks_1[nPoin_x-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile2.close();
 //	}
 //
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_find_peaks/x_at_wall.dat", ios::out);
+//		myfile2.open ("2_validation_find_peaks/x_at_wall.dat", ios::out);
 //		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
 //			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile << x_at_wall[iPoin][kPoin] << ", ";
+//				myfile2 << x_at_wall[iPoin][kPoin] << ", ";
 //			}
-//			myfile << x_at_wall[nPoin_x-1][kPoin] << endl;
+//			myfile2 << x_at_wall[nPoin_x-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile2.close();
 //	}
 //
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_find_peaks/Wm_plus.dat", ios::out);
+//		myfile2.open ("2_validation_find_peaks/Wm_plus.dat", ios::out);
 //		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
 //			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile << Wm_plus[iPoin][kPoin] << ", ";
+//				myfile2 << Wm_plus[iPoin][kPoin] << ", ";
 //			}
-//			myfile << Wm_plus[nPoin_x-1][kPoin] << endl;
+//			myfile2 << Wm_plus[nPoin_x-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile2.close();
 //	}
 //	//END VALIDATION
 
@@ -1863,6 +1868,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	unsigned long jj, kk;
 	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
 	su2double tot_avg_amplitude, tot_avg_period;
+	su2double avg_wavelength_p, avg_wavelength_t;
 	tot_avg_amplitude = 0.0;
 	tot_avg_period = 0.0;
 	su2double nu_inf = Viscosity_Inf / Density_Inf;
@@ -1883,16 +1889,16 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	tot_avg_amplitude /= nPoin_z;
 
 //	//FOR VALIDATION ONLY
-//	ofstream myfile;
+//	ofstream myfile3;
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_averaging/amplitude_peaks.dat", ios::out);
+//		myfile3.open ("3_validation_averaging/amplitude_peaks.dat", ios::out);
 //		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
 //			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile << amplitude_peaks[iPoin][kPoin] << ", ";
+//				myfile3 << amplitude_peaks[iPoin][kPoin] << ", ";
 //			}
-//			myfile << amplitude_peaks[nPoin_x-1][kPoin] << endl;
+//			myfile3 << amplitude_peaks[nPoin_x-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile3.close();
 //	}
 //	//END VALIDATION
 
@@ -1908,24 +1914,24 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			if (peaks_1[iPoin][kPoin] == 1){ // check whether it is a peak (or a through)
 				if (jj == 0){
 					min_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate min(x_loc) of a peak
-					count_peaks += 1;
+					count_peaks++;
 					jj++;
 				}
 				else{
 					max_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate temporary x_loc of a peak; after the array has been completely traversed, it will be max(x_loc))
-					count_peaks += 1;
+					count_peaks++;
 				}
 			}
 
 			if (peaks_1[iPoin][kPoin] == -1){
 				if (kk == 0){
 					min_loc_through = x_loc_peaks[iPoin][kPoin];
-					count_throughs += 1;
+					count_throughs++;
 					kk++;
 				}
 				else{
 					max_loc_through = x_loc_peaks[iPoin][kPoin];
-					count_throughs += 1;
+					count_throughs++;
 				}
 			}
 
@@ -1934,7 +1940,21 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 
 		avg_utau[kPoin] /= nPoin_x;
-		avg_wavelength[kPoin] = ( (max_loc_peak-min_loc_peak)/(count_peaks-1) + (max_loc_through - min_loc_through)/(count_throughs-1) ) / 2.0;
+		if (count_peaks <=1 ){
+			if (rank == MASTER_NODE)
+				cout << "Warning: count_peaks <= 1! Artificially setting it to 2!!!" << endl;
+			count_peaks = 2;
+		}
+		if (count_throughs <= 1 ){
+			if (rank == MASTER_NODE)
+				cout << "Warning: count_throughs <= 1! Artificially setting it to 2!!!" << endl;
+			count_throughs = 2;
+		}
+		avg_wavelength_p = (max_loc_peak - min_loc_peak)/(count_peaks - 1);					// average wavelength peaks
+		avg_wavelength_t = (max_loc_through - min_loc_through)/(count_throughs - 1);		// average wavelength throughs
+		avg_wavelength[kPoin] = ( avg_wavelength_p + avg_wavelength_t ) / 2.0;			// Total average wavelength
+//		cout << "maxp[" << kPoin << "] = " << max_loc_peak << ", minp[" << kPoin << "] = " << min_loc_peak << ", np = " << count_peaks << endl;
+//		cout << "maxt[" << kPoin << "] = " << max_loc_through << ", mint[" << kPoin << "] = " << min_loc_through << ", np = " << count_throughs << endl;
 		avg_period[kPoin] = avg_wavelength[kPoin] / Velocity_Inf[0]; // transform from wavelength (m) to period (s)
 		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu_inf; //normalize
 		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
@@ -1942,29 +1962,29 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	tot_avg_period /= nPoin_z;
 
 //	//FOR VALIDATION ONLY
-//	ofstream myfile;
+//	ofstream myfile3;
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_averaging/x_loc_peaks.dat", ios::out);
+//		myfile3.open ("3_validation_averaging/x_loc_peaks.dat", ios::out);
 //		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
 //			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile << x_loc_peaks[iPoin][kPoin] << ", ";
+//				myfile3 << x_loc_peaks[iPoin][kPoin] << ", ";
 //			}
-//			myfile << x_loc_peaks[nPoin_x-1][kPoin] << endl;
+//			myfile3 << x_loc_peaks[nPoin_x-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile3.close();
 //	}
 //	//END VALIDATION
 //
 //	//FOR VALIDATION ONLY
 //	if (rank == MASTER_NODE){
-//		myfile.open ("validation_averaging/peaks_1.dat", ios::out);
+//		myfile3.open ("3_validation_averaging/peaks_1.dat", ios::out);
 //		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
 //			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile << peaks_1[iPoin][kPoin] << ", ";
+//				myfile3 << peaks_1[iPoin][kPoin] << ", ";
 //			}
-//			myfile << peaks_1[nPoin_x-1][kPoin] << endl;
+//			myfile3 << peaks_1[nPoin_x-1][kPoin] << endl;
 //		}
-//		myfile.close();
+//		myfile3.close();
 //	}
 //	//END VALIDATION
 
@@ -1992,21 +2012,30 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	xint[1] = tot_avg_amplitude;
 
 	if (isnan(xint[0]) || isnan(xint[1])){
-		throw("Error:Either T+ or Wm+ are Nan!!!");
+		if (rank == MASTER_NODE)
+			cout << "Warning: Either T+ or Wm+ are Nan!!!" << endl;
+	}
+	if (isinf(xint[0]) || isinf(xint[1])){
+		if (rank == MASTER_NODE)
+			cout << "Warning: Either T+ or Wm+ are Inf!!!" << endl;
 	}
 
 	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
 
 //	//FOR VALIDATION ONLY: verify routine works using synthetic data.
-//	cout << "T+ = " << xint[0] << ", Wm+ = " << xint[1] << ", R = " << R << endl;
+//	if (rank = MASTER_NODE){
+//		cout << "T+ = " << xint[0] << ", Wm+ = " << xint[1] << ", R = " << R << endl;
+//	}
 //	//END VALIDATION
 
-	su2double Re_tau_flat_plate = 1e3; //placeholder
-	su2double flat_plate_viscous_drag = 1.0; //placeholder
+	su2double Re_tau_flat_plate = config->Get_Stokes_Re_tau_flat_plate();
+	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate);
+//	if (rank == MASTER_NODE)
+//		cout << "R = " << R << endl;
 
-	return R * flat_plate_viscous_drag;
+	return R * flat_plate_viscous_drag_coeff;  //viscous drag reduction w.r.t. flat plate.
 
 }
 
@@ -2101,7 +2130,7 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 	su2double count;
 
 	konst = 1; //HARDCODED
-	npoint = 6; //HARDCODED
+	npoint = 7; //HARDCODED
 
 	x = new su2double[npoint];
 	y = new su2double[npoint];
@@ -2118,75 +2147,67 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 			//number of points with the same wm_plus sign as the inflection point:
 			max_idx = peaks[iPoin][1][kPoin] + konst;
 			sig_change_idx = peaks[iPoin][2][kPoin];
-			npoints_same_sign = max_idx - sig_change_idx;
+			npoints_same_sign = max_idx - sig_change_idx -1;
 
-//			if (kPoin == 0){
-//				cout << "max_idx = " << max_idx << ", sig_change_idx = " << sig_change_idx << ", npoints_same_sign = " << npoints_same_sign << endl;
+//			if (kPoin == 42){
+//				cout << "i = " << iPoin << ", max_idx = " << max_idx << ", sig_change_idx = " << sig_change_idx << ", npoints_same_sign = " << npoints_same_sign << endl;
 //			}
 
-			 if (npoints_same_sign >= npoint){ //linear fitting of an exponential
-
-				/*--- Start with fitting ---*/
-				sx=0.0; sy=0.0; st2=0.0;
-				b=0.0;
-
-				/*--- Transform wm+ = Wm*exp(B*y+) into a linear form log(wm+) = log(Wm+) + B*y+;
-				 * i.e. y = a + bx, where y = log(wm+), a = log(Wm+), b = B, x = y+ ---*/
-				for (jPoin=0; jPoin<npoint; jPoin++) {
-					x[jPoin] = y_plus[iPoin][max_idx-npoint+jPoin][kPoin];
-					y[jPoin] = log(abs(wm_plus[iPoin][max_idx-npoint+jPoin][kPoin]));
-				}
-
-				/*--- Accumulate sums without weights. ---*/
-				for (jPoin=0; jPoin<npoint; jPoin++) {
-					sx += x[jPoin];
-					sy += y[jPoin];
-				}
-				ss = npoint;
-				sxoss = sx/ss;
-
-				for (jPoin=0; jPoin<npoint; jPoin++) {
-					t = x[jPoin]-sxoss;
-					st2 += t*t;
-					b += t*y[jPoin];
-				}
-
-				/*--- Solve for a, b ---*/
-				b /= st2;
-				a = (sy-sx*b)/ss;
-
-				/*---Compute Wm+ and B ---*/
-				if (peaks[iPoin][0][kPoin] == 1){ 	//if +ve wm_plus at inflection point
-					Wm_plus[iPoin][kPoin] = exp(a); // This is wm_plus evaluated at the wall
-					B[iPoin][kPoin] = b;
-				}
-				else{								//if -ve wm_plus at inflection point
-					Wm_plus[iPoin][kPoin] = -1.0 * exp(a); // This is wm_plus evaluated at the wall
-					B[iPoin][kPoin] = b;
-				}
-
-			 }
-
-			 else { // linear fitting of a line
-
-				/*--- Start with fitting ---*/
-				sx=0.0; sy=0.0; st2=0.0;
-				b=0.0;
-
-//				if (max_idx >= npoint){ // if there are enough points above the inflection point -> fit a line between inflection point and point npoint above the inflection point
-//					xx[0] = y_plus[iPoin][max_idx-konst-npoint+1][kPoin];
-//					xx[1] = y_plus[iPoin][max_idx-konst][kPoin];
+//			 if (npoints_same_sign >= npoint){ //linear fitting of an exponential
 //
-//					yy[0] = wm_plus[iPoin][max_idx-konst-npoint+1][kPoin];
-//					yy[1] = wm_plus[iPoin][max_idx-konst][kPoin];
+//				/*--- Start with fitting ---*/
+//				sx=0.0; sy=0.0; st2=0.0;
+//				b=0.0;
+//
+//				/*--- Transform wm+ = Wm*exp(B*y+) into a linear form log(wm+) = log(Wm+) + B*y+;
+//				 * i.e. y = a + bx, where y = log(wm+), a = log(Wm+), b = B, x = y+ ---*/
+//				for (jPoin=0; jPoin<npoint; jPoin++) {
+//					x[jPoin] = y_plus[iPoin][max_idx-npoint+jPoin][kPoin];
+//					y[jPoin] = log(abs(wm_plus[iPoin][max_idx-npoint+jPoin][kPoin]));
 //				}
-//				else{					// fit a line between inflection point and point immediately above it
+//
+//				/*--- Accumulate sums without weights. ---*/
+//				for (jPoin=0; jPoin<npoint; jPoin++) {
+//					sx += x[jPoin];
+//					sy += y[jPoin];
+//				}
+//				ss = npoint;
+//				sxoss = sx/ss;
+//
+//				for (jPoin=0; jPoin<npoint; jPoin++) {
+//					t = x[jPoin]-sxoss;
+//					st2 += t*t;
+//					b += t*y[jPoin];
+//				}
+//
+//				/*--- Solve for a, b ---*/
+//				b /= st2;
+//				a = (sy-sx*b)/ss;
+//
+//				/*---Compute Wm+ and B ---*/
+//				if (peaks[iPoin][0][kPoin] == 1){ 	//if +ve wm_plus at inflection point
+//					Wm_plus[iPoin][kPoin] = exp(a); // This is wm_plus evaluated at the wall
+//					B[iPoin][kPoin] = b;
+//				}
+//				else{								//if -ve wm_plus at inflection point
+//					Wm_plus[iPoin][kPoin] = -1.0 * exp(a); // This is wm_plus evaluated at the wall
+//					B[iPoin][kPoin] = b;
+//				}
+//
+//			 }
+//
+//			 else { // linear fitting of a line
+
+				/*--- Start with fitting ---*/
+				sx=0.0; sy=0.0; st2=0.0;
+				b=0.0;
+
+				// fit a line between inflection point and point immediately above it
 				xx[0] = y_plus[iPoin][max_idx-konst-1][kPoin];
 				xx[1] = y_plus[iPoin][max_idx-konst][kPoin];
 
 				yy[0] = wm_plus[iPoin][max_idx-konst-1][kPoin];
 				yy[1] = wm_plus[iPoin][max_idx-konst][kPoin];
-//				}
 
 				/*--- Accumulate sums without weights. ---*/
 				count = 0;
@@ -2211,7 +2232,7 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 				/*---Compute Wm+ and B ---*/
 				Wm_plus[iPoin][kPoin] = a; // This is wm_plus evaluated at the wall
 				B[iPoin][kPoin] = b;
-			 }
+//			 }
 		}
 	}
 
@@ -2562,9 +2583,9 @@ su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
 	/*--- Compute friction drag reduction ---*/
 	R_new = A * pow(Re_tau, B);
 
-	if (rank == MASTER_NODE){
-		cout << "Rnew = " << R_new << endl;
-	}
+//	if (rank == MASTER_NODE){
+//		cout << "Rnew = " << R_new << endl;
+//	}
 
 	/*--- Remove line offset if it exists ---*/
 	err = Rsearch - A * pow(Re_tau_in, B);

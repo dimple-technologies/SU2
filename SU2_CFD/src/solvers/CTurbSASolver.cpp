@@ -206,7 +206,9 @@ CTurbSASolver::CTurbSASolver(CGeometry *geometry, CConfig *config, unsigned shor
   Avg_CFL_Local = CFL;
 
   /*--- Read sampling lines when computing drag coefficient with Stokes layer methodology ---*/
-  ReadSamplingLines(geometry, config);
+  if (config->Get_BoolStokesDrag() == true){
+	  ReadSamplingLines(geometry, config);
+  }
 
   /*--- Add the solver name (max 8 characters) ---*/
   SolverName = "SA";

@@ -1141,6 +1141,9 @@ private:
   unsigned short Kind_Inlet_InterpolationType;    /*!brief type of spanwise interpolation data to use for the inlet face. */
   bool PrintInlet_InterpolatedData;               /*!brief option for printing the interpolated data file. */
 
+  bool BoolStokesDrag;
+  su2double Re_tau_flat_plate, flat_plate_viscous_drag_coeff;
+
   unsigned long *nPoin_samplingLines, *nPoin_Ricco;
   unsigned long ***samplingLines;
   su2double ***RiccoField;
@@ -9408,5 +9411,9 @@ public:
 
   void Set_boolsamplingLines(void) { stokesLayerMethod = true; }
   bool Get_boolsamplingLines(void) { return stokesLayerMethod; }
+
+  bool Get_BoolStokesDrag(void) { return BoolStokesDrag; }
+  su2double Get_Stokes_Re_tau_flat_plate(void) {return Re_tau_flat_plate; }
+  su2double Get_Stokes_flat_plate_viscous_drag_coeff(void) {return flat_plate_viscous_drag_coeff; }
 
 };

@@ -1167,7 +1167,8 @@ void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
   }
   input_file.close();
   config->Set_boolsamplingLines(); /* Set boolean to true */
-  cout << "indexStokes.dat read." << endl;
+  if (rank == MASTER_NODE)
+	  cout << "indexStokes.dat read." << endl;
 
 //  /* Uncomment if need to debug */
 //  if (rank == MASTER_NODE){
@@ -1226,7 +1227,8 @@ void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
 	}
   }
   input_file.close();
-  cout << "RiccoField.dat read." << endl;
+  if (rank == MASTER_NODE)
+	  cout << "RiccoField.dat read." << endl;
 
 //    /* Uncomment if need to debug */
 //    if (rank == MASTER_NODE){

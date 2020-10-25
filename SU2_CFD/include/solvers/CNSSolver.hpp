@@ -61,7 +61,7 @@ private:
   StrainMag_Max,
   Omega_Max;             /*!< \brief Maximum Strain Rate magnitude and Omega. */
 
-  su2double *u_tau = nullptr;
+  su2double *u_tau;
 
   /*!
    * \brief A virtual member.

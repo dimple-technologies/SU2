@@ -2781,6 +2781,14 @@ void CConfig::SetConfig_Options() {
   /* DESCRIPTION: Size of the edge groups colored for thread parallel edge loops (0 forces the reducer strategy). */
   addUnsignedLongOption("EDGE_COLORING_GROUP_SIZE", edgeColorGroupSize, 512);
 
+
+  /* DESCRIPTION: Compute drag using Stokes method. */
+  addBoolOption("STOKES_DRAG", BoolStokesDrag, false);
+  /* DESCRIPTION: Reynolds_tau of flat plate simulation */
+  addDoubleOption("STOKES_RE_TAU_FLAT_PLATE", Re_tau_flat_plate, 1e3);
+  /* DESCRIPTION: Viscous drag coefficient of flat plate simulation */
+  addDoubleOption("STOKES_VISCOUS_CD_FLAT_PLATE", flat_plate_viscous_drag_coeff, 0.1);
+
   /* END_CONFIG_OPTIONS */
 
 }
