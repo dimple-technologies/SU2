@@ -1688,21 +1688,16 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	/*--- Populate all the matrices by sharing info among the cores ---*/
 
 #ifdef HAVE_MPI
-	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
-		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
-			for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
-				SU2_MPI::Allreduce(&local_wm_plus[iPoin][jPoin][kPoin], &wm_plus[iPoin][jPoin][kPoin], 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-				SU2_MPI::Allreduce(&local_y_plus[iPoin][jPoin][kPoin], &y_plus[iPoin][jPoin][kPoin], 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-				SU2_MPI::Allreduce(&local_x_pos[iPoin][jPoin][kPoin], &x_pos[iPoin][jPoin][kPoin], 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-			}
-	    }
-    }
 
 	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
-		for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
-			SU2_MPI::Allreduce(&local_u_tau[iPoin][kPoin], &u_tau[iPoin][kPoin], 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		SU2_MPI::Allreduce(local_u_tau[iPoin], u_tau[iPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
+			SU2_MPI::Allreduce(local_wm_plus[iPoin][jPoin], wm_plus[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			SU2_MPI::Allreduce(local_y_plus[iPoin][jPoin], y_plus[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			SU2_MPI::Allreduce(local_x_pos[iPoin][jPoin], x_pos[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		}
-    }
+	}
+
 #else
 	&wm_plus= &local_wm_plus;
 	&y_plus = &local_y_plus;
