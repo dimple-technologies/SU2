@@ -1151,13 +1151,13 @@ void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
 				/* --- Populate the matrix samplingLines with local index for each core ---*/
 				local_index = geometry->GetGlobal_to_Local_Point(global_index);
 				if (local_index < nPointDomain){
-					config->Set_samplingLines(xx,yy,zz,local_index);
+					config->Set_samplingLines(xx,yy,zz-1,local_index);
 				}
 				else{
 					/*--- if the global_index cannot be mapped to a local index of this core,
-					than set it to an index that no point would have, e.g. nPointGlobal+1
+					then set it to an index that no point would have, e.g. nPointGlobal+1
 					(NB. 0 is a valid local index) ---*/
-					config->Set_samplingLines(xx,yy,zz,nPointGlobal+1);
+					config->Set_samplingLines(xx,yy,zz-1,nPointGlobal+1);
 				}
 				++yy;
 			}
@@ -1219,7 +1219,7 @@ void CTurbSolver::ReadSamplingLines(CGeometry *geometry, CConfig *config){
 		else{
 			yy = 0;
 			while(point_line >> val){
-				config->Set_RiccoField(xx,yy,zz,val);
+				config->Set_RiccoField(xx,yy,zz-1,val);
 				++yy;
 			}
 			++xx;

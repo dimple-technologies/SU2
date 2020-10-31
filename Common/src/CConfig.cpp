@@ -9649,10 +9649,10 @@ void CConfig::Initialize_RiccoField(unsigned long nPoin_x, unsigned long nPoin_y
 }
 
 void CConfig::Set_samplingLines(unsigned long xx, unsigned long yy, unsigned long zz, unsigned long val){
-	samplingLines[xx][yy][zz-1] = val;
+	samplingLines[xx][yy][zz] = val;
 }
 
 void CConfig::Set_RiccoField(unsigned long xx, unsigned long yy, unsigned long zz, su2double val){
-	RiccoField[xx][yy][zz-1] = val;
+	RiccoField[xx][yy][zz] = val;
 }
 
