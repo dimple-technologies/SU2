@@ -1713,8 +1713,6 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
 				y_plus[iPoin][jPoin][kPoin] *= u_tau[iPoin][kPoin]; // wall distance
 				wm_plus[iPoin][jPoin][kPoin] /= u_tau[iPoin][kPoin]; // spanwise velocity (w)
-//				if (rank == MASTER_NODE && kPoin == 20 && iPoin == 40)
-//					cout << "wm_plus[" << jPoin << "] = " << wm_plus[iPoin][jPoin][kPoin] << ", u_tau = " << u_tau[iPoin][kPoin] << endl;
 			}
 		}
 	}
@@ -1959,7 +1957,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		avg_wavelength[kPoin] = ( avg_wavelength_p + avg_wavelength_t ) / 2.0;			// Total average wavelength
 //		cout << "maxp[" << kPoin << "] = " << max_loc_peak << ", minp[" << kPoin << "] = " << min_loc_peak << ", np = " << count_peaks << endl;
 //		cout << "maxt[" << kPoin << "] = " << max_loc_through << ", mint[" << kPoin << "] = " << min_loc_through << ", np = " << count_throughs << endl;
-		avg_period[kPoin] = avg_wavelength[kPoin] / (0.75 * Velocity_Inf[0]); // transform from wavelength (m) to period (s) //	HARDCODED (NEED SENSITIVITY STUDY)!!!!
+		avg_period[kPoin] = avg_wavelength[kPoin] / (0.99 * Velocity_Inf[0]); // transform from wavelength (m) to period (s) //	HARDCODED (NEED SENSITIVITY STUDY)!!!!
 		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu_inf; //normalize
 		tot_avg_u_tau += avg_utau[kPoin];
 		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
@@ -2029,20 +2027,20 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 
 	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
 
-//	//FOR VALIDATION ONLY: verify routine works using synthetic data.
-//	if (rank == MASTER_NODE){
-//		cout << "T+ = " << xint[0] << ", Wm+ = " << xint[1] << ", R = " << R << endl;
-//	}
-//	//END VALIDATION
+	//FOR VALIDATION ONLY: verify routine works using synthetic data.
+	if (rank == MASTER_NODE){
+		cout << "T+ = " << xint[0] << ", Wm+ = " << xint[1] << ", R = " << R << endl;
+	}
+	//END VALIDATION
 
 	su2double Re_tau_flat_plate = config->Get_Stokes_Re_tau_flat_plate();
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
-	R = ReynoldsScalingRicco(R, Re_tau_flat_plate);
-//	if (rank == MASTER_NODE)
-//		cout << "R = " << R << endl;
+	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
+	if (rank == MASTER_NODE)
+		cout << "R = " << R << endl;
 
-	return R * flat_plate_viscous_drag_coeff;  //viscous drag reduction w.r.t. flat plate.
+	return (R / 100.0 ) * flat_plate_viscous_drag_coeff;  //viscous drag reduction w.r.t. flat plate.
 
 }
 
