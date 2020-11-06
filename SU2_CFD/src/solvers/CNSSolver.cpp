@@ -1619,6 +1619,12 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	unsigned long ***samplingLines;
 	su2double ***wm_plus, ***y_plus, ***x_pos, ***local_wm_plus, ***local_y_plus, ***local_x_pos;
 	su2double laminar_viscosity, eddy_viscosity, density, total_viscosity, nu;
+	su2double ***tke_approx, ***local_tke_approx;
+
+	su2double Grad_Vel[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}}, div_vel,
+	delta_ij[3][3] = {{1.0, 0.0, 0.0},{0.0,1.0,0.0},{0.0,0.0,1.0}},
+	Sij_star[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}};
+	unsigned short iDim, jDim;
 
 	nPointLocal = nPointDomain;
 #ifdef HAVE_MPI
@@ -1634,9 +1640,11 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	local_wm_plus = new su2double **[nPoin_x];
 	local_y_plus = new su2double **[nPoin_x];
 	local_x_pos = new su2double **[nPoin_x];
+	local_tke_approx = new su2double **[nPoin_x];
 	wm_plus = new su2double **[nPoin_x];
 	y_plus = new su2double **[nPoin_x];
 	x_pos = new su2double **[nPoin_x];
+	tke_approx = new su2double **[nPoin_x];
 
 	su2double **local_u_tau, **u_tau;
 	local_u_tau = new su2double *[nPoin_x];
@@ -1650,27 +1658,33 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		local_wm_plus[iPoin] = new su2double *[nPoin_y];
 		local_y_plus[iPoin] = new su2double *[nPoin_y];
 		local_x_pos[iPoin] = new su2double *[nPoin_y];
+		local_tke_approx[iPoin] = new su2double *[nPoin_y];
 		u_tau[iPoin] = new su2double [nPoin_z];
 		wm_plus[iPoin] = new su2double *[nPoin_y];
 		y_plus[iPoin] = new su2double *[nPoin_y];
 		x_pos[iPoin] = new su2double *[nPoin_y];
+		tke_approx[iPoin] = new su2double *[nPoin_y];
 
 		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
 
 			local_wm_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			local_y_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			local_x_pos[iPoin][jPoin] = new su2double [nPoin_z];
+			local_tke_approx[iPoin][jPoin] = new su2double [nPoin_z];
 			wm_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			y_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			x_pos[iPoin][jPoin] = new su2double [nPoin_z];
+			tke_approx[iPoin][jPoin] = new su2double [nPoin_z];
 
 			for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
 				local_index = config->Get_samplingLines(iPoin, jPoin, kPoin);
 				local_index_b = config->Get_samplingLines(iPoin, nPoin_y, kPoin); //points at the wall are stored at index nPoin_y
+
 				if (local_index == nPointGlobal+1){ //in CTurbSolver::ReadSamplingLines() local_index is set to nPointGlobal+1 if it does not belong to the subdomain.
 					local_wm_plus[iPoin][jPoin][kPoin] = 0;
 					local_y_plus[iPoin][jPoin][kPoin] = 0;
 					local_x_pos[iPoin][jPoin][kPoin] = 0;
+					local_tke_approx[iPoin][jPoin][kPoin] = 0; // tke approx inspired by SA QCR (2013) model : https://turbmodels.larc.nasa.gov/spalart.html
 					local_u_tau[iPoin][kPoin] = GetFrictionVel(local_index_b);
 				}
 				else{
@@ -1681,6 +1695,26 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 					local_y_plus[iPoin][jPoin][kPoin] = geometry->nodes->GetWall_Distance(local_index) / nu; // wall distance same formula as in CNSsolver::Firction_Forces()
 					local_x_pos[iPoin][jPoin][kPoin] = geometry->nodes->GetCoord(local_index, 0);	// streamwise coordinate (x)
 					local_u_tau[iPoin][kPoin] = GetFrictionVel(local_index_b);
+
+					/*--- Compute gradient of velocity, divergence and strain rate in order to approximate t.k.e. ---*/
+				    for (iDim = 0; iDim < nDim; iDim++) {
+				      for (jDim = 0 ; jDim < nDim; jDim++) {
+				        Grad_Vel[iDim][jDim] = nodes->GetGradient_Primitive(local_index, iDim+1, jDim);
+				      }
+				    }
+
+				    div_vel = 0.0; for (iDim = 0; iDim < nDim; iDim++) div_vel += Grad_Vel[iDim][iDim];
+
+			        for (iDim = 0; iDim < nDim; iDim++) {
+			          for (jDim = 0 ; jDim < nDim; jDim++) {
+			        	  Sij_star[iDim][jDim] = (Grad_Vel[jDim][iDim] + Grad_Vel[iDim][jDim])/2.0 - 1.0/3.0*div_vel*delta_ij[iDim][jDim];
+			          }
+			        }
+
+
+					local_tke_approx[iPoin][jPoin][kPoin] = nodes->GetEddyViscosity(local_index)/density *
+							                                sqrt(2.0 * (Sij_star[0][0]*Sij_star[0][0] + Sij_star[1][1]*Sij_star[1][1] + Sij_star[2][2]*Sij_star[2][2]) );
+
 				}
 			}
 		}
@@ -1697,6 +1731,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			SU2_MPI::Allreduce(local_wm_plus[iPoin][jPoin], wm_plus[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 			SU2_MPI::Allreduce(local_y_plus[iPoin][jPoin], y_plus[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 			SU2_MPI::Allreduce(local_x_pos[iPoin][jPoin], x_pos[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			SU2_MPI::Allreduce(local_tke_approx[iPoin][jPoin], tke_approx[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		}
 	}
 
@@ -1705,6 +1740,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	&y_plus = &local_y_plus;
 	&x_pos 	= &local_x_pos;
 	&u_tau 	= &local_u_tau;
+	&tke_approx	= &local_tke_approx;
 #endif
 
 	/* --- Divide by u_tau: wm_plus = wm / u_tau, y_plus = wall_dist * u_tau / nu ---*/
@@ -1723,21 +1759,27 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	su2double **Wm_plus; // initialize Matrix of equivalent spanwise velocity (i.e. a wave) at the wall
 	su2double **x_at_wall; // streamwise coordinates at the wall along a slice
 	su2double **B;
-	unsigned long ***peaks;
+	unsigned long ***peaks, ***peaks_tke;
 
 	Wm_plus = new su2double*[nPoin_x];				//each wave is evaluated along the streamwise direction (x-coord)
 	x_at_wall = new su2double*[nPoin_x];
 	B = new su2double*[nPoin_x];
 	peaks = new unsigned long**[nPoin_x];
+	peaks_tke = new unsigned long**[nPoin_x];
 	for (iPoin = 0; iPoin < nPoin_x; iPoin++){
 		Wm_plus[iPoin] = new su2double[nPoin_z];	// one wave for every spanwise (z_coord) slice
 		x_at_wall[iPoin] = new su2double[nPoin_z];
 		B[iPoin] = new su2double[nPoin_z];
 		peaks[iPoin] = new unsigned long*[3]; 		// one element to store whether it's a peak or a through; one to store the index; one to store change of sign index;
+		peaks_tke[iPoin] = new unsigned long*[3];
 		for (jPoin = 0; jPoin < 3; jPoin++){
 			peaks[iPoin][jPoin] = new unsigned long[nPoin_z];
+			peaks_tke[iPoin][jPoin] = new unsigned long[nPoin_z];
 		}
 	}
+
+	/*--- Find tke inflection point closest to wall ---*/
+	Find_peak_closest_to_wall(tke_approx, nPoin_x, nPoin_y, nPoin_z, 1e-4, peaks_tke);
 
 	/*--- Find inflection point closest to wall ---*/
 	Find_peak_closest_to_wall(wm_plus, nPoin_x, nPoin_y, nPoin_z, 1e-4, peaks);
@@ -1790,6 +1832,39 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //		}
 //		myfile1.close();
 //	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("6_tke_approx_validation/tke.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << tke_approx[iPoin][jPoin][kPoin] << ", ";
+//			}
+//			myfile1 << tke_approx[iPoin][nPoin_y-1][kPoin] << endl;
+//		}
+//		myfile1.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("6_tke_approx_validation/y_plusP.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
+//			}
+//			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
+//		}
+//		myfile1.close();
+//	}
+//
+//	/*--- Uncomment if need to debug ---*/
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("6_tke_approx_validation/peaks_tke.dat", ios::out);
+//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+//			myfile1 << peaks_tke[iPoin][1][kPoin] << ", " ;
+//		}
+//		myfile1 << peaks_tke[nPoin_x-1][1][kPoin] << endl;
+//		myfile1.close();
+//	}
+//
 //  //END VALIDATION
 
 	/*--- Compute equivalent spanwise oscialltion at the wall ---*/
@@ -1872,6 +1947,28 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	tot_avg_period = 0.0;
 	su2double nu_inf = Viscosity_Inf / Density_Inf;
 
+	su2double **vel_peak, **nu_peak;
+
+	vel_peak = new su2double *[nPoin_x];
+	nu_peak = new su2double *[nPoin_x];
+	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+		vel_peak[iPoin] = new su2double [nPoin_z];
+		nu_peak[iPoin] = new su2double [nPoin_z];
+		for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
+			vel_peak[iPoin][kPoin] = 0.0;
+			nu_peak[iPoin][kPoin] = 0.0;
+		}
+	}
+
+	/*--- Retrieve streamwise velocity and laminar viscodity in correspondence of peaks ---*/
+	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+		for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
+			local_index = config->Get_samplingLines(iPoin, peaks_tke[iPoin][1][kPoin], kPoin);
+			vel_peak[iPoin][kPoin] = nodes->GetVelocity(local_index, 0);
+			nu_peak[iPoin][kPoin] = nodes->GetLaminarViscosity(local_index) / nodes->GetDensity(local_index);
+		}
+	}
+
 	/*---Compute average wave amplitude ---*/
 	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
 		avg_amplitude[kPoin] = 0; // initialize to zero
@@ -1903,11 +2000,13 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //	//END VALIDATION
 
 	su2double tot_avg_u_tau = 0;
+	su2double avg_vel, avg_nu;
 
 	/*---Compute average wavelength :  avg_wavelength = (max(x_loc) - min(x_loc))/number of waves---*/
 	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
 		avg_wavelength[kPoin] = 0; // initialize to zero
 		avg_utau[kPoin] = 0;
+		avg_nu = 0; avg_vel = 0;
 		count_peaks = 0; count_throughs = 0;
 		jj=0; kk=0;
 
@@ -1938,10 +2037,15 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			}
 
 			avg_utau[kPoin] += u_tau[iPoin][kPoin];
+			avg_vel += vel_peak[iPoin][kPoin];
+			avg_nu += nu_peak[iPoin][kPoin];
 
 		}
 
 		avg_utau[kPoin] /= nPoin_x;
+		avg_vel /= nPoin_x;
+		avg_nu /= nPoin_x;
+
 		if (count_peaks <=1 ){
 			if (rank == MASTER_NODE)
 				cout << "Warning: count_peaks <= 1! Artificially setting it to 2!!!" << endl;
@@ -1954,18 +2058,22 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 		avg_wavelength_p = (max_loc_peak - min_loc_peak)/(count_peaks - 1);					// average wavelength peaks
 		avg_wavelength_t = (max_loc_through - min_loc_through)/(count_throughs - 1);		// average wavelength throughs
-		avg_wavelength[kPoin] = ( avg_wavelength_p + avg_wavelength_t ) / 2.0;			// Total average wavelength
-//		cout << "maxp[" << kPoin << "] = " << max_loc_peak << ", minp[" << kPoin << "] = " << min_loc_peak << ", np = " << count_peaks << endl;
-//		cout << "maxt[" << kPoin << "] = " << max_loc_through << ", mint[" << kPoin << "] = " << min_loc_through << ", np = " << count_throughs << endl;
-		avg_period[kPoin] = avg_wavelength[kPoin] / (0.99 * Velocity_Inf[0]); // transform from wavelength (m) to period (s) //	HARDCODED (NEED SENSITIVITY STUDY)!!!!
-		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu_inf; //normalize
+		avg_wavelength[kPoin] = ( avg_wavelength_p + avg_wavelength_t ) / 2.0;				// Total average wavelength
+		// Method 1: C * V_inf //
+//		avg_period[kPoin] = avg_wavelength[kPoin] / (0.99 * Velocity_Inf[0]); // transform from wavelength (m) to period (s)
+//		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu_inf; //normalize
+
+		// Method 2: U at peak in tke //
+		avg_period[kPoin] = avg_wavelength[kPoin] / avg_vel; // transform from wavelength (m) to period (s)
+		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / avg_nu; //normalize
+//		cout << "avg_vel[" << kPoin << "] = " << avg_vel << endl;
+//		cout << "avg_nu[" << kPoin << "] = " << avg_nu << endl;
+
 		tot_avg_u_tau += avg_utau[kPoin];
 		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
 	}
 	tot_avg_period /= nPoin_z;
 	tot_avg_u_tau /= nPoin_z;
-
-//	cout << "avg_Re_tau = " << tot_avg_u_tau*0.02/nu_inf << endl; //0.02 = diameter of dimple
 
 //	//FOR VALIDATION ONLY
 //	if (rank == MASTER_NODE){
