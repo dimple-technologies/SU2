@@ -2124,14 +2124,14 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	xint[0] = tot_avg_period;
 	xint[1] = tot_avg_amplitude;
 
-	if (isnan(xint[0]) || isnan(xint[1])){
-		if (rank == MASTER_NODE)
-			cout << "Warning: Either T+ or Wm+ are Nan!!!" << endl;
-	}
-	if (isinf(xint[0]) || isinf(xint[1])){
-		if (rank == MASTER_NODE)
-			cout << "Warning: Either T+ or Wm+ are Inf!!!" << endl;
-	}
+//	if (isnan(xint[0]) || isnan(xint[1])){
+//		if (rank == MASTER_NODE)
+//			cout << "Warning: Either T+ or Wm+ are Nan!!!" << endl;
+//	}
+//	if (isinf(xint[0]) || isinf(xint[1])){
+//		if (rank == MASTER_NODE)
+//			cout << "Warning: Either T+ or Wm+ are Inf!!!" << endl;
+//	}
 
 	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
 
