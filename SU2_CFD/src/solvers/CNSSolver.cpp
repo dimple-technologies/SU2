@@ -1619,7 +1619,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	unsigned long ***samplingLines;
 	su2double ***wm_plus, ***y_plus, ***x_pos, ***local_wm_plus, ***local_y_plus, ***local_x_pos;
 	su2double laminar_viscosity, eddy_viscosity, density, total_viscosity, nu;
-	su2double ***tke_approx, ***local_tke_approx;
+	su2double ***tke_approx, ***local_tke_approx, ***u_streamwise, ***local_u_streamwise,
+	***nu_turb, ***local_nu_turb;
 
 	su2double Grad_Vel[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}}, div_vel,
 	delta_ij[3][3] = {{1.0, 0.0, 0.0},{0.0,1.0,0.0},{0.0,0.0,1.0}},
@@ -1641,10 +1642,14 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	local_y_plus = new su2double **[nPoin_x];
 	local_x_pos = new su2double **[nPoin_x];
 	local_tke_approx = new su2double **[nPoin_x];
+	local_u_streamwise = new su2double **[nPoin_x];
+	local_nu_turb = new su2double **[nPoin_x];
 	wm_plus = new su2double **[nPoin_x];
 	y_plus = new su2double **[nPoin_x];
 	x_pos = new su2double **[nPoin_x];
 	tke_approx = new su2double **[nPoin_x];
+	u_streamwise = new su2double **[nPoin_x];
+	nu_turb = new su2double **[nPoin_x];
 
 	su2double **local_u_tau, **u_tau;
 	local_u_tau = new su2double *[nPoin_x];
@@ -1659,11 +1664,15 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		local_y_plus[iPoin] = new su2double *[nPoin_y];
 		local_x_pos[iPoin] = new su2double *[nPoin_y];
 		local_tke_approx[iPoin] = new su2double *[nPoin_y];
+		local_u_streamwise[iPoin] = new su2double *[nPoin_y];
+		local_nu_turb[iPoin] = new su2double *[nPoin_y];
 		u_tau[iPoin] = new su2double [nPoin_z];
 		wm_plus[iPoin] = new su2double *[nPoin_y];
 		y_plus[iPoin] = new su2double *[nPoin_y];
 		x_pos[iPoin] = new su2double *[nPoin_y];
 		tke_approx[iPoin] = new su2double *[nPoin_y];
+		u_streamwise[iPoin] = new su2double *[nPoin_y];
+		nu_turb[iPoin] = new su2double *[nPoin_y];
 
 		for (jPoin = 0; jPoin < nPoin_y; ++jPoin){
 
@@ -1671,10 +1680,14 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			local_y_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			local_x_pos[iPoin][jPoin] = new su2double [nPoin_z];
 			local_tke_approx[iPoin][jPoin] = new su2double [nPoin_z];
+			local_u_streamwise[iPoin][jPoin] = new su2double [nPoin_z];
+			local_nu_turb[iPoin][jPoin] = new su2double [nPoin_z];
 			wm_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			y_plus[iPoin][jPoin] = new su2double [nPoin_z];
 			x_pos[iPoin][jPoin] = new su2double [nPoin_z];
 			tke_approx[iPoin][jPoin] = new su2double [nPoin_z];
+			u_streamwise[iPoin][jPoin] = new su2double [nPoin_z];
+			nu_turb[iPoin][jPoin] = new su2double [nPoin_z];
 
 			for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
 				local_index = config->Get_samplingLines(iPoin, jPoin, kPoin);
@@ -1685,6 +1698,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 					local_y_plus[iPoin][jPoin][kPoin] = 0;
 					local_x_pos[iPoin][jPoin][kPoin] = 0;
 					local_tke_approx[iPoin][jPoin][kPoin] = 0; // tke approx inspired by SA QCR (2013) model : https://turbmodels.larc.nasa.gov/spalart.html
+					local_u_streamwise[iPoin][jPoin][kPoin] = 0;
+					local_nu_turb[iPoin][jPoin][kPoin] = 0;
 					local_u_tau[iPoin][kPoin] = GetFrictionVel(local_index_b);
 				}
 				else{
@@ -1695,6 +1710,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 					local_y_plus[iPoin][jPoin][kPoin] = geometry->nodes->GetWall_Distance(local_index) / nu; // wall distance same formula as in CNSsolver::Firction_Forces()
 					local_x_pos[iPoin][jPoin][kPoin] = geometry->nodes->GetCoord(local_index, 0);	// streamwise coordinate (x)
 					local_u_tau[iPoin][kPoin] = GetFrictionVel(local_index_b);
+					local_u_streamwise[iPoin][jPoin][kPoin] = nodes->GetVelocity(local_index, 0);
+					local_nu_turb[iPoin][jPoin][kPoin] = nodes->GetLaminarViscosity(local_index) / nodes->GetDensity(local_index);
 
 					/*--- Compute gradient of velocity, divergence and strain rate in order to approximate t.k.e. ---*/
 				    for (iDim = 0; iDim < nDim; iDim++) {
@@ -1732,6 +1749,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			SU2_MPI::Allreduce(local_y_plus[iPoin][jPoin], y_plus[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 			SU2_MPI::Allreduce(local_x_pos[iPoin][jPoin], x_pos[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 			SU2_MPI::Allreduce(local_tke_approx[iPoin][jPoin], tke_approx[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			SU2_MPI::Allreduce(local_u_streamwise[iPoin][jPoin], u_streamwise[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			SU2_MPI::Allreduce(local_nu_turb[iPoin][jPoin], nu_turb[iPoin][jPoin], nPoin_z, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		}
 	}
 
@@ -1741,6 +1760,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	&x_pos 	= &local_x_pos;
 	&u_tau 	= &local_u_tau;
 	&tke_approx	= &local_tke_approx;
+	&u_streamwise	= &local_u_streamwise;
+	&nu_turb= &local_nu_turb;
 #endif
 
 	/* --- Divide by u_tau: wm_plus = wm / u_tau, y_plus = wall_dist * u_tau / nu ---*/
@@ -1788,9 +1809,11 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	Find_change_of_sign(wm_plus, nPoin_x, nPoin_y, nPoin_z, peaks);
 
 //	//FOR VALIDATION ONLY
-//	kPoin = 20;
+//	kPoin = 0;
 //
 //	ofstream myfile1;
+//
+//
 //	/*--- Uncomment if need to debug ---*/
 //	if (rank == MASTER_NODE){
 //		myfile1.open ("1_validation_fit_exponential/peaksP.dat", ios::out);
@@ -1960,12 +1983,12 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
-	/*--- Retrieve streamwise velocity and laminar viscodity in correspondence of peaks ---*/
+	/*--- Retrieve streamwise velocity and laminar viscosity in correspondence of peaks ---*/
 	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
 		for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
-			local_index = config->Get_samplingLines(iPoin, peaks_tke[iPoin][1][kPoin], kPoin);
-			vel_peak[iPoin][kPoin] = nodes->GetVelocity(local_index, 0);
-			nu_peak[iPoin][kPoin] = nodes->GetLaminarViscosity(local_index) / nodes->GetDensity(local_index);
+			jPoin = peaks_tke[iPoin][1][kPoin];
+			vel_peak[iPoin][kPoin] = u_streamwise[iPoin][jPoin][kPoin];
+			nu_peak[iPoin][kPoin] = nu_turb[iPoin][jPoin][kPoin];
 		}
 	}
 
@@ -2145,8 +2168,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
-	if (rank == MASTER_NODE)
-		cout << "R = " << R << endl;
+//	if (rank == MASTER_NODE)
+//		cout << "R = " << R << endl;
 
 	return (R / 100.0 ) * flat_plate_viscous_drag_coeff;  //viscous drag reduction w.r.t. flat plate.
 
@@ -2315,6 +2338,10 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 				sx=0.0; sy=0.0; st2=0.0;
 				b=0.0;
 
+				//if max_idx is close to top of domain, then wm+ is a straight line -> take value close to wall
+				//to avoid (max_idx-konst-3) being -ve (Segmentation fault). --> MOVE IT TO FINDPEAKS()
+				if (max_idx < 3+konst){max_idx = nPoin_y-1;}
+
 				// fit a line between inflection point and point immediately above it
 				xx[0] = y_plus[iPoin][max_idx-konst-3][kPoin];
 				xx[1] = y_plus[iPoin][max_idx-konst-1][kPoin];
@@ -2345,6 +2372,7 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 				/*---Compute Wm+ and B ---*/
 				Wm_plus[iPoin][kPoin] = a; // This is wm_plus evaluated at the wall
 				B[iPoin][kPoin] = b;
+
 //			 }
 		}
 	}
