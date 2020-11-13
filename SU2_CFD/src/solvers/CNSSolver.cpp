@@ -1616,11 +1616,9 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 
 	unsigned long iPoin, jPoin, kPoin, nPoin_x, nPoin_y, nPoin_z, local_index;
 	unsigned long nPointLocal, nPointGlobal;
-	unsigned long ***samplingLines;
+	su2double nu;
 	su2double ***wm_plus, ***y_plus, ***x_pos, ***local_wm_plus, ***local_y_plus, ***local_x_pos;
-	su2double laminar_viscosity, eddy_viscosity, density, total_viscosity, nu;
-	su2double ***tke_approx, ***local_tke_approx, ***u_streamwise, ***local_u_streamwise,
-	***nu_turb, ***local_nu_turb;
+	su2double ***tke_approx, ***local_tke_approx, ***u_streamwise, ***local_u_streamwise, ***nu_turb, ***local_nu_turb;
 
 	su2double Grad_Vel[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}}, div_vel,
 	delta_ij[3][3] = {{1.0, 0.0, 0.0},{0.0,1.0,0.0},{0.0,0.0,1.0}},
@@ -1703,15 +1701,13 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 					local_u_tau[iPoin][kPoin] = GetFrictionVel(local_index_b);
 				}
 				else{
-					laminar_viscosity 	= nodes->GetLaminarViscosity(local_index);
-					density 			= nodes->GetDensity(local_index);
-					nu 					= laminar_viscosity / density;
+					nu 	= nodes->GetLaminarViscosity(local_index) / nodes->GetDensity(local_index);
 					local_wm_plus[iPoin][jPoin][kPoin] = nodes->GetVelocity(local_index, 2); // spanwise velocity (w)
 					local_y_plus[iPoin][jPoin][kPoin] = geometry->nodes->GetWall_Distance(local_index) / nu; // wall distance same formula as in CNSsolver::Firction_Forces()
 					local_x_pos[iPoin][jPoin][kPoin] = geometry->nodes->GetCoord(local_index, 0);	// streamwise coordinate (x)
 					local_u_tau[iPoin][kPoin] = GetFrictionVel(local_index_b);
 					local_u_streamwise[iPoin][jPoin][kPoin] = nodes->GetVelocity(local_index, 0);
-					local_nu_turb[iPoin][jPoin][kPoin] = nodes->GetLaminarViscosity(local_index) / nodes->GetDensity(local_index);
+					local_nu_turb[iPoin][jPoin][kPoin] = nu;
 
 					/*--- Compute gradient of velocity, divergence and strain rate in order to approximate t.k.e. ---*/
 				    for (iDim = 0; iDim < nDim; iDim++) {
@@ -1728,8 +1724,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			          }
 			        }
 
-
-					local_tke_approx[iPoin][jPoin][kPoin] = nodes->GetEddyViscosity(local_index)/density *
+					local_tke_approx[iPoin][jPoin][kPoin] = nodes->GetEddyViscosity(local_index)/nodes->GetDensity(local_index) *
 							                                sqrt(2.0 * (Sij_star[0][0]*Sij_star[0][0] + Sij_star[1][1]*Sij_star[1][1] + Sij_star[2][2]*Sij_star[2][2]) );
 
 				}
@@ -1737,8 +1732,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
-
-	/*--- Populate all the matrices by sharing info among the cores ---*/
+/*--- Populate all the matrices by sharing info among the cores ---*/
 
 #ifdef HAVE_MPI
 
@@ -1893,8 +1887,6 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	/*--- Compute equivalent spanwise oscialltion at the wall ---*/
 	Fit_exponential(wm_plus, y_plus, x_pos, nPoin_x, nPoin_y, nPoin_z, Wm_plus, x_at_wall, B, peaks);
 
-
-
 //	//FOR VALIDATION ONLY: For each slice, for each x, plot the actual wm_plus and the fitted exponential. Visually check they make sense.
 //
 //	for (iPoin=0; iPoin < nPoin_x; iPoin++){
@@ -2004,7 +1996,6 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 		avg_amplitude[kPoin] /= count;			   // average amplitude of the slice
 		tot_avg_amplitude += avg_amplitude[kPoin]; // average amplitude of the entire test case (Wm+)
-//		cout << "avg[" << kPoin << "] = " << avg_amplitude[kPoin] << endl;
 	}
 	tot_avg_amplitude /= nPoin_z;
 
@@ -2079,14 +2070,16 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 				cout << "Warning: count_throughs <= 1! Artificially setting it to 2!!!" << endl;
 			count_throughs = 2;
 		}
+
 		avg_wavelength_p = (max_loc_peak - min_loc_peak)/(count_peaks - 1);					// average wavelength peaks
 		avg_wavelength_t = (max_loc_through - min_loc_through)/(count_throughs - 1);		// average wavelength throughs
 		avg_wavelength[kPoin] = ( avg_wavelength_p + avg_wavelength_t ) / 2.0;				// Total average wavelength
-		// Method 1: C * V_inf //
+
+//		/*--- Method 1: C * V_inf ---*/
 //		avg_period[kPoin] = avg_wavelength[kPoin] / (0.99 * Velocity_Inf[0]); // transform from wavelength (m) to period (s)
 //		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu_inf; //normalize
 
-		// Method 2: U at peak in tke //
+		/*--- Method 2: U at peak in tke ---*/
 		avg_period[kPoin] = avg_wavelength[kPoin] / avg_vel; // transform from wavelength (m) to period (s)
 		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / avg_nu; //normalize
 //		cout << "avg_vel[" << kPoin << "] = " << avg_vel << endl;
@@ -2095,6 +2088,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		tot_avg_u_tau += avg_utau[kPoin];
 		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
 	}
+
 	tot_avg_period /= nPoin_z;
 	tot_avg_u_tau /= nPoin_z;
 
@@ -2147,15 +2141,6 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	xint[0] = tot_avg_period;
 	xint[1] = tot_avg_amplitude;
 
-//	if (isnan(xint[0]) || isnan(xint[1])){
-//		if (rank == MASTER_NODE)
-//			cout << "Warning: Either T+ or Wm+ are Nan!!!" << endl;
-//	}
-//	if (isinf(xint[0]) || isinf(xint[1])){
-//		if (rank == MASTER_NODE)
-//			cout << "Warning: Either T+ or Wm+ are Inf!!!" << endl;
-//	}
-
 	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
 
 	//FOR VALIDATION ONLY: verify routine works using synthetic data.
@@ -2168,12 +2153,94 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
-//	if (rank == MASTER_NODE)
-//		cout << "R = " << R << endl;
 
+	/*--- Deallocate memory ---*/
+	for (iPoin = 0; iPoin < nPoin_x; iPoin++) {
+		for (jPoin = 0; jPoin < nPoin_y; jPoin++){
+			delete [] local_wm_plus[iPoin][jPoin];
+			delete [] wm_plus[iPoin][jPoin];
+			delete [] local_y_plus[iPoin][jPoin];
+			delete [] y_plus[iPoin][jPoin];
+			delete [] local_x_pos[iPoin][jPoin];
+			delete [] x_pos[iPoin][jPoin];
+			delete [] local_tke_approx[iPoin][jPoin];
+			delete [] tke_approx[iPoin][jPoin];
+			delete [] local_u_streamwise[iPoin][jPoin];
+			delete [] u_streamwise[iPoin][jPoin];
+			delete [] local_nu_turb[iPoin][jPoin];
+			delete [] nu_turb[iPoin][jPoin];
+			if (jPoin < 3){
+				delete [] peaks[iPoin][jPoin];
+				delete [] peaks_tke[iPoin][jPoin];
+			}
+		  }
+		delete [] local_wm_plus[iPoin];
+		delete [] wm_plus[iPoin];
+		delete [] local_y_plus[iPoin];
+		delete [] y_plus[iPoin];
+		delete [] local_x_pos[iPoin];
+		delete [] x_pos[iPoin];
+		delete [] local_tke_approx[iPoin];
+		delete [] tke_approx[iPoin];
+		delete [] local_u_streamwise[iPoin];
+		delete [] u_streamwise[iPoin];
+		delete [] local_nu_turb[iPoin];
+		delete [] nu_turb[iPoin];
+		delete [] local_u_tau[iPoin];
+		delete [] u_tau[iPoin];
+		delete [] peaks[iPoin];
+		delete [] peaks_tke[iPoin];
+		delete [] Wm_plus[iPoin];
+		delete [] x_at_wall[iPoin];
+		delete [] B[iPoin];
+		delete [] peaks_1[iPoin];
+		delete [] x_loc_peaks[iPoin];
+		delete [] amplitude_peaks[iPoin];
+		delete [] vel_peak[iPoin];
+		delete [] nu_peak[iPoin];
+	  }
+	delete [] local_wm_plus;
+	delete [] wm_plus;
+	delete [] local_y_plus;
+	delete [] y_plus;
+	delete [] local_x_pos;
+	delete [] x_pos;
+	delete [] local_tke_approx;
+	delete [] tke_approx;
+	delete [] local_u_streamwise;
+	delete [] u_streamwise;
+	delete [] local_nu_turb;
+	delete [] nu_turb;
+	delete [] local_u_tau;
+	delete [] u_tau;
+	delete [] peaks;
+	delete [] peaks_tke;
+	delete [] Wm_plus;
+	delete [] x_at_wall;
+	delete [] B;
+	delete [] peaks_1;
+	delete [] x_loc_peaks;
+	delete [] amplitude_peaks;
+	delete [] avg_amplitude;
+	delete [] avg_wavelength;
+	delete [] avg_period;
+	delete [] avg_utau;
+	delete [] vel_peak;
+	delete [] nu_peak;
+
+	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++) {
+		delete [] zz[iPoin];
+	}
+	delete [] xx;
+	delete [] yy;
+	delete [] zz;
+	delete [] xint;
+
+	// Return viscous drag reduction
 	return (R / 100.0 ) * flat_plate_viscous_drag_coeff;  //viscous drag reduction w.r.t. flat plate.
 
 }
+
 
 //void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2double ***x_pos, unsigned long nPoin_x, unsigned long nPoin_y,
 //		                        unsigned long nPoin_z, su2double **Wm_plus, su2double **x_at_wall, su2double **B) {
@@ -2377,6 +2444,12 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 		}
 	}
 
+	/*--- Deallocate memory ---*/
+	delete [] x;
+	delete [] y;
+	delete [] xx;
+	delete [] yy;
+
 }
 
 
@@ -2391,7 +2464,7 @@ void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
 
 	/*--- Main code from: https://github.com/xuphys/peakdetect/blob/master/peakdetect.c ---*/
 
-    unsigned long iPoin,kPoin;
+    unsigned long iPoin, kPoin;
     su2double  mx, mn;
     unsigned long mx_pos;
     unsigned long mn_pos;
@@ -2735,6 +2808,11 @@ su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
 	R_new *= -100;
 	if (mirrored)
 		R_new = -1.0 * R_new;
+
+	/*--- Deallocate memory ---*/
+	delete [] a;
+	delete [] b;
+	delete [] R_in;
 
 	return R_new;
 
