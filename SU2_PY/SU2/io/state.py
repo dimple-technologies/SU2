@@ -258,6 +258,8 @@ class State(ordered_bunch):
         targetea_name = 'TargetEA.dat'
         targetcp_name = 'TargetCp.dat'
         targetheatflux_name = 'TargetHeatFlux.dat'
+        riccoField_name = 'RiccoField.dat'
+        indexStokes_name = 'indexStokes.dat'
 
         adj_map = get_adjointSuffix()
         restart = config.RESTART_SOL == 'YES'
@@ -365,6 +367,18 @@ class State(ordered_bunch):
         # heat flux inverse design
         if 'INV_DESIGN_HEATFLUX' in special_cases:
             register_file('TARGET_HEATFLUX',targetheatflux_name)
+            
+        # Input file name when specifying inlet boundary profile
+        if config['SPECIFIED_INLET_PROFILE'] == 'YES':
+            assert os.path.exists(config.INLET_FILENAME), ('INLET_FILENAME %s NOT FOUND.' % config.INLET_FILENAME )
+            register_file('INPUT_PROFILE', config.INLET_FILENAME)
+            
+        # Input file name when computing viscous drag using Stokes method.
+        if config['STOKES_DRAG'] == 'YES':
+            assert os.path.exists(riccoField_name), (f'{riccoField_name} not found.' )
+            assert os.path.exists(indexStokes_name), (f'{indexStokes_name} not found.' )
+            register_file('RICCO_FIELD', riccoField_name)
+            register_file('INDEX_STOKES', indexStokes_name)
 
         return
     

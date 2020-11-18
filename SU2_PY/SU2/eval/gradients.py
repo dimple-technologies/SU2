@@ -288,6 +288,13 @@ def adjoint( func_name, config, state=None ):
 
     if not 'SURFACE_CSV' in config['OUTPUT_FILES']:
       config['OUTPUT_FILES'].append('SURFACE_CSV')
+      
+    if config.SPECIFIED_INLET_PROFILE == 'YES':
+        pull.append( files['INPUT_PROFILE'] )
+        
+    if config.STOKES_DRAG == 'YES':
+        pull.append( files['RICCO_FIELD'] )
+        pull.append( files['INDEX_STOKES'] )
     
 
     # output redirection
@@ -849,6 +856,13 @@ def findiff( config, state=None ):
     # files: target heat flux distribution
     if 'INV_DESIGN_HEATFLUX' in special_cases and 'TARGET_HEATFLUX' in files:
         pull.append(files['TARGET_HEATFLUX'])
+        
+    if config.SPECIFIED_INLET_PROFILE == 'YES':
+        pull.append( files['INPUT_PROFILE'] )
+        
+    if config.STOKES_DRAG == 'YES':
+        pull.append( files['RICCO_FIELD'] )
+        pull.append( files['INDEX_STOKES'] )
 
        
     # output redirection
@@ -1137,6 +1151,13 @@ def directdiff( config, state=None ):
     # files: target heat flux distribution
     if 'INV_DESIGN_HEATFLUX' in special_cases and 'TARGET_HEATFLUX' in files:
         pull.append(files['TARGET_HEATFLUX'])
+        
+    if config.SPECIFIED_INLET_PROFILE == 'YES':
+        pull.append( files['INPUT_PROFILE'] )
+        
+    if config.STOKES_DRAG == 'YES':
+        pull.append( files['RICCO_FIELD'] )
+        pull.append( files['INDEX_STOKES'] )
 
     # output redirection
     with redirect_folder('DIRECTDIFF',pull,link) as push:

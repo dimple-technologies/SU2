@@ -262,7 +262,14 @@ def aerodynamics( config, state=None ):
     if ( 'INV_DESIGN_HEATFLUX' in special_cases and
          'TARGET_HEATFLUX' in files ) :
         pull.append( files['TARGET_HEATFLUX'] )
-
+        
+    if config.SPECIFIED_INLET_PROFILE == 'YES':
+        pull.append( files['INPUT_PROFILE'] )
+        
+    if config.STOKES_DRAG == 'YES':
+        pull.append( files['RICCO_FIELD'] )
+        pull.append( files['INDEX_STOKES'] )
+        
 
     # output redirection
     with redirect_folder( 'DIRECT', pull, link ) as push:
@@ -306,6 +313,13 @@ def aerodynamics( config, state=None ):
                 
             if 'FLOW_META' in info.FILES:
                 push.append(info.FILES['FLOW_META'])
+                
+            if config.SPECIFIED_INLET_PROFILE == 'YES':
+                push.append( files['INPUT_PROFILE'] )
+                
+            if config.STOKES_DRAG == 'YES':
+                push.append( files['RICCO_FIELD'] )
+                push.append( files['INDEX_STOKES'] )
                 
     #: with output redirection
     su2io.update_persurface(konfig,state)
@@ -397,6 +411,13 @@ def stability( config, state=None, step=1e-2 ):
     if ( 'INV_DESIGN_HEATFLUX' in special_cases and
          'TARGET_HEATFLUX' in files ) :
         pull.append( files['TARGET_HEATFLUX'] )
+        
+    if config.SPECIFIED_INLET_PROFILE == 'YES':
+        pull.append( files['INPUT_PROFILE'] )
+        
+    if config.STOKES_DRAG == 'YES':
+        pull.append( files['RICCO_FIELD'] )
+        pull.append( files['INDEX_STOKES'] )
 
     # pull needed files, start folder
     with redirect_folder( folder, pull, link ) as push:
@@ -580,6 +601,13 @@ def multipoint( config, state=None, step=1e-2 ):
     if ( 'INV_DESIGN_HEATFLUX' in special_cases and
         'TARGET_HEATFLUX' in files ) :
         pull.append( files['TARGET_HEATFLUX'] )
+        
+    if config.SPECIFIED_INLET_PROFILE == 'YES':
+        pull.append( files['INPUT_PROFILE'] )
+        
+    if config.STOKES_DRAG == 'YES':
+        pull.append( files['RICCO_FIELD'] )
+        pull.append( files['INDEX_STOKES'] )
 
     # pull needed files, start folder_0
     with redirect_folder( folder[0], pull, link ) as push:

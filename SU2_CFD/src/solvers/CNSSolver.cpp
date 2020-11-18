@@ -693,7 +693,7 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
     }
   }
 
-  /*--- Update some global coeffients ---*/
+  /*--- Update some global coefficients ---*/
 
   AllBoundViscCoeff.CEff = AllBoundViscCoeff.CL / (AllBoundViscCoeff.CD + EPS);
   AllBoundViscCoeff.CMerit = AllBoundViscCoeff.CT / (AllBoundViscCoeff.CQ + EPS);
@@ -799,17 +799,6 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
   Total_Heat         = AllBound_HF_Visc;
   Total_MaxHeat      = AllBound_MaxHF_Visc;
 
-//  cout << "cd_visc = " << AllBoundViscCoeff.CD << endl;
-
-  if (config->Get_BoolStokesDrag() == true){
-	  su2double delta_cd;
-	  delta_cd = Compute_ViscCD_StokesMethod(geometry, config); // The TOTAL viscous Cd reduction is computed by every processor (no need to sum them up).
-	  // Take only the value at the MASTER_NODE.
-	  if (rank == MASTER_NODE){
-		  TotalCoeff.CD += delta_cd; //add/subtract drag increase/reduction from viscous drag coefficient
-	  }
-  }
-
   /*--- Update the total coefficients per surface (note that all the nodes have the same value)---*/
 
   for (iMarker_Monitoring = 0; iMarker_Monitoring < config->GetnMarker_Monitoring(); iMarker_Monitoring++) {
@@ -823,6 +812,20 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
     SurfaceCoeff.CMx[iMarker_Monitoring]        += SurfaceViscCoeff.CMx[iMarker_Monitoring];
     SurfaceCoeff.CMy[iMarker_Monitoring]        += SurfaceViscCoeff.CMy[iMarker_Monitoring];
     SurfaceCoeff.CMz[iMarker_Monitoring]        += SurfaceViscCoeff.CMz[iMarker_Monitoring];
+  }
+
+
+  // Add to each node the computed value of the viscous drag reduction using Stokes method
+  // Note: Each node will have info about the drag of the whole system (and not only that of the part of the domain associated to the node).
+  // This is possible because after this point there are no additional MPI operations (e.g. Allreduce())
+  if (config->Get_BoolStokesDrag() == true){
+	su2double delta_cd;
+	delta_cd = Compute_ViscCD_StokesMethod(geometry, config); // The TOTAL viscous Cd reduction is computed by every processor (no need to sum them up).
+	if (config->GetnMarker_Monitoring() == 1){// Currently works only if there is only 1 marker that is monitored
+      iMarker_Monitoring = 0;
+	  SurfaceCoeff.CD[iMarker_Monitoring] += delta_cd;
+	  TotalCoeff.CD += delta_cd; //add/subtract drag increase/reduction from viscous drag coefficient
+	}
   }
 
 }
@@ -2138,7 +2141,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
-	xint[0] = tot_avg_period;
+//	xint[0] = tot_avg_period;
+	xint[0] = tot_avg_period / 3.0; //divide by 3 to exit flat region where R=100
 	xint[1] = tot_avg_amplitude;
 
 	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
