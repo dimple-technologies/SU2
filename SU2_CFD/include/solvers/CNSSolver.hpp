@@ -598,6 +598,9 @@ public:
 
   inline void SetFrictionVel(unsigned long iPoint, su2double val_frictionvel)  { u_tau[iPoint] = val_frictionvel; }
 
+  void realft(su2double *data, su2double isign, unsigned long data_size);
+  void four1(su2double *data, su2double isign, unsigned long data_size);
+
 };
 
 

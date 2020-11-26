@@ -1898,73 +1898,9 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //	cout << endl;
 //  //END VALIDATION
 
-	/*--- For each slice, find peaks and throughs of the equivalent spanwise oscillation at the wall (Wm_plus) ---*/
-	su2double **peaks_1, **x_loc_peaks,  **amplitude_peaks;
-    peaks_1 = new su2double*[nPoin_x];
-    x_loc_peaks = new su2double*[nPoin_x];
-    amplitude_peaks = new su2double*[nPoin_x];
-    for (iPoin=0; iPoin < nPoin_x; iPoin++){
-    	peaks_1[iPoin] = new su2double [nPoin_z];
-    	x_loc_peaks[iPoin] = new su2double [nPoin_z];
-    	amplitude_peaks[iPoin] = new su2double [nPoin_z];
-    }
+	/*--- Compute Fourier transform of Wm+ for each slice ---*/
 
-    su2double delta = 0.10; //HARDCODED
-	Find_peaks_and_throughs(Wm_plus, x_at_wall, nPoin_x, nPoin_z, delta, peaks_1, x_loc_peaks, amplitude_peaks);
-
-//	//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
-//	ofstream myfile2;
-//	/*--- Uncomment if need to debug ---*/
-//	if (rank == MASTER_NODE){
-//		myfile2.open ("2_validation_find_peaks/peaks_1.dat", ios::out);
-//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//			for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-//				myfile2 << peaks_1[iPoin][kPoin] << ", ";
-//			}
-//			myfile2 << peaks_1[nPoin_x-1][kPoin] << endl;
-//		}
-//		myfile2.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile2.open ("2_validation_find_peaks/x_at_wall.dat", ios::out);
-//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile2 << x_at_wall[iPoin][kPoin] << ", ";
-//			}
-//			myfile2 << x_at_wall[nPoin_x-1][kPoin] << endl;
-//		}
-//		myfile2.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile2.open ("2_validation_find_peaks/Wm_plus.dat", ios::out);
-//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile2 << Wm_plus[iPoin][kPoin] << ", ";
-//			}
-//			myfile2 << Wm_plus[nPoin_x-1][kPoin] << endl;
-//		}
-//		myfile2.close();
-//	}
-//	END VALIDATION
-
-	/*--- Initialize variables for next routine ---*/
-	su2double *avg_amplitude, *avg_wavelength, *avg_period, *avg_utau;
-	avg_amplitude = new su2double [nPoin_z];
-	avg_wavelength = new su2double [nPoin_z];
-	avg_period = new su2double [nPoin_z];
-	avg_utau = new su2double [nPoin_z];
-	unsigned long count;
-	unsigned long count_peaks, count_throughs;
-	unsigned long jj, kk;
-	su2double max_loc_peak, min_loc_peak, max_loc_through, min_loc_through;
-	su2double tot_avg_amplitude, tot_avg_period;
-	su2double avg_wavelength_p, avg_wavelength_t;
-	tot_avg_amplitude = 0.0;
-	tot_avg_period = 0.0;
-	su2double nu_inf = Viscosity_Inf / Density_Inf;
-
+	// Transform distance into time //
 	su2double **vel_peak, **nu_peak;
 
 	vel_peak = new su2double *[nPoin_x];
@@ -1987,150 +1923,50 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
-	/*---Compute average wave amplitude ---*/
-	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
-		avg_amplitude[kPoin] = 0; // initialize to zero
-		count = 0;
-		for (iPoin = 0; iPoin < nPoin_x; iPoin++){
-			if (amplitude_peaks[iPoin][kPoin] != 0){
-				avg_amplitude[kPoin] += abs(amplitude_peaks[iPoin][kPoin]);
-				count += 1; //count the number of peaks/troughs
-			}
-		}
-		avg_amplitude[kPoin] /= count;			   // average amplitude of the slice
-		tot_avg_amplitude += avg_amplitude[kPoin]; // average amplitude of the entire test case (Wm+)
+
+	su2double avg_vel, avg_utau, avg_nu;
+	su2double min_t, max_t, freq_spacing;
+	su2double *time, *wm_plus_for_fft;
+	time = new su2double[nPoin_x];
+	wm_plus_for_fft = new su2double[nPoin_x];
+
+	unsigned long count, n, fft_npoin;
+	count = 0; n = nPoin_x;
+	while( n != 0){
+		n >>= 1;
+		count += 1;
 	}
-	tot_avg_amplitude /= nPoin_z;
+	fft_npoin = pow(2, count);
 
-//	//FOR VALIDATION ONLY
-//	ofstream myfile3;
-//	if (rank == MASTER_NODE){
-//		myfile3.open ("3_validation_averaging/amplitude_peaks.dat", ios::out);
-//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile3 << amplitude_peaks[iPoin][kPoin] << ", ";
-//			}
-//			myfile3 << amplitude_peaks[nPoin_x-1][kPoin] << endl;
-//		}
-//		myfile3.close();
-//	}
-//	//END VALIDATION
-
-	su2double tot_avg_u_tau = 0;
-	su2double avg_vel, avg_nu;
-
-	/*---Compute average wavelength :  avg_wavelength = (max(x_loc) - min(x_loc))/number of waves---*/
-	for (kPoin = 0; kPoin < nPoin_z; kPoin++){
-		avg_wavelength[kPoin] = 0; // initialize to zero
-		avg_utau[kPoin] = 0;
-		avg_nu = 0; avg_vel = 0;
-		count_peaks = 0; count_throughs = 0;
-		jj=0; kk=0;
-
-		for (iPoin = 0; iPoin <nPoin_x; iPoin++){ //traverse array from the back
-
-			if (peaks_1[iPoin][kPoin] == 1){ // check whether it is a peak (or a through)
-				if (jj == 0){
-					min_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate min(x_loc) of a peak
-					count_peaks++;
-					jj++;
-				}
-				else{
-					max_loc_peak = x_loc_peaks[iPoin][kPoin]; //allocate temporary x_loc of a peak; after the array has been completely traversed, it will be max(x_loc))
-					count_peaks++;
-				}
-			}
-
-			if (peaks_1[iPoin][kPoin] == -1){
-				if (kk == 0){
-					min_loc_through = x_loc_peaks[iPoin][kPoin];
-					count_throughs++;
-					kk++;
-				}
-				else{
-					max_loc_through = x_loc_peaks[iPoin][kPoin];
-					count_throughs++;
-				}
-			}
-
-			avg_utau[kPoin] += u_tau[iPoin][kPoin];
-			avg_vel += vel_peak[iPoin][kPoin];
-			avg_nu += nu_peak[iPoin][kPoin];
-
-		}
-
-		avg_utau[kPoin] /= nPoin_x;
-		avg_vel /= nPoin_x;
-		avg_nu /= nPoin_x;
-
-		if (count_peaks <=1 ){
-			if (rank == MASTER_NODE)
-				cout << "Warning: count_peaks <= 1! Artificially setting it to 2!!!" << endl;
-			count_peaks = 2;
-		}
-		if (count_throughs <= 1 ){
-			if (rank == MASTER_NODE)
-				cout << "Warning: count_throughs <= 1! Artificially setting it to 2!!!" << endl;
-			count_throughs = 2;
-		}
-
-		avg_wavelength_p = (max_loc_peak - min_loc_peak)/(count_peaks - 1);					// average wavelength peaks
-		avg_wavelength_t = (max_loc_through - min_loc_through)/(count_throughs - 1);		// average wavelength throughs
-		avg_wavelength[kPoin] = ( avg_wavelength_p + avg_wavelength_t ) / 2.0;				// Total average wavelength
-
-//		/*--- Method 1: C * V_inf ---*/
-//		avg_period[kPoin] = avg_wavelength[kPoin] / (0.99 * Velocity_Inf[0]); // transform from wavelength (m) to period (s)
-//		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / nu_inf; //normalize
-
-		/*--- Method 2: U at peak in tke ---*/
-		avg_period[kPoin] = avg_wavelength[kPoin] / avg_vel; // transform from wavelength (m) to period (s)
-		avg_period[kPoin] *= avg_utau[kPoin]*avg_utau[kPoin] / avg_nu; //normalize
-//		cout << "avg_vel[" << kPoin << "] = " << avg_vel << endl;
-//		cout << "avg_nu[" << kPoin << "] = " << avg_nu << endl;
-
-		tot_avg_u_tau += avg_utau[kPoin];
-		tot_avg_period += avg_period[kPoin];   //total average period of the entire test case (T+)
+	su2double *tmp_time, *tmp_wmplus, **fft_freq, **fft_period, **fft_wmplus, h, val;
+	su2double freq;
+	tmp_time = new su2double[fft_npoin];
+	tmp_wmplus = new su2double[fft_npoin];
+	fft_freq = new su2double*[fft_npoin/2]; // fft_npoin/2 only when analyzing a real-valued signal
+	fft_period = new su2double*[fft_npoin/2];
+	fft_wmplus = new su2double*[fft_npoin/2];
+	for (iPoin=0; iPoin < fft_npoin/2; iPoin++) {
+		fft_freq[iPoin] = new su2double[nPoin_z];
+		fft_period[iPoin] = new su2double[nPoin_z];
+		fft_wmplus[iPoin] = new su2double[nPoin_z];
 	}
-
-	tot_avg_period /= nPoin_z;
-	tot_avg_u_tau /= nPoin_z;
-
-//	//FOR VALIDATION ONLY
-//	if (rank == MASTER_NODE){
-//		myfile3.open ("3_validation_averaging/x_loc_peaks.dat", ios::out);
-//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile3 << x_loc_peaks[iPoin][kPoin] << ", ";
-//			}
-//			myfile3 << x_loc_peaks[nPoin_x-1][kPoin] << endl;
-//		}
-//		myfile3.close();
-//	}
-//	//END VALIDATION
-//
-//	//FOR VALIDATION ONLY
-//	if (rank == MASTER_NODE){
-//		myfile3.open ("3_validation_averaging/peaks_1.dat", ios::out);
-//		for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//			for (iPoin=0; iPoin < nPoin_x-1; iPoin++){
-//				myfile3 << peaks_1[iPoin][kPoin] << ", ";
-//			}
-//			myfile3 << peaks_1[nPoin_x-1][kPoin] << endl;
-//		}
-//		myfile3.close();
-//	}
-//	//END VALIDATION
-//
-	/*--- Compute R-factor by interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
-	/*--- R represents the % friction drag reduction compared to a flat plate ---*/
 
 	su2double *xx, *yy, **zz, *xint;
-	su2double R;
+	su2double **tmp_R, **weight;
+	su2double R, sum_tmp_R=0, sum_weight=0;
 
+	tmp_R = new su2double* [fft_npoin/2];
+	weight = new su2double* [fft_npoin/2];
+	xint = new su2double [2];
+	for (iPoin=0; iPoin < fft_npoin/2; iPoin++) {
+		tmp_R[iPoin] = new su2double[nPoin_z];
+		weight[iPoin] = new su2double[nPoin_z];
+	}
+
+	// Allocate Ricco data
 	xx = new su2double [config->Get_nPoinx_Ricco()];
 	yy = new su2double [config->Get_nPoiny_Ricco()];
 	zz = new su2double* [config->Get_nPoinx_Ricco()];
-	xint = new su2double [2];
 
 	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++){
 		xx[iPoin] = config->Get_RiccoField(0, iPoin, 0);			// only one row is necessary for bilinear interp on an *ordered grid* of points.
@@ -2141,22 +1977,155 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
-//	xint[0] = tot_avg_period;
-	xint[0] = tot_avg_period / 3.0; //divide by 3 to exit flat region where R=100
-	xint[1] = tot_avg_amplitude;
 
-	R = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
+	for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
 
-	//FOR VALIDATION ONLY: verify routine works using synthetic data.
-	if (rank == MASTER_NODE){
-		cout << "T+ = " << xint[0] << ", Wm+ = " << xint[1] << ", R = " << R << endl;
+		avg_vel=0; avg_utau=0; avg_nu=0;
+
+		for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+			avg_vel  += vel_peak[iPoin][kPoin];
+			avg_utau += u_tau[iPoin][kPoin];
+			avg_nu   += nu_peak[iPoin][kPoin];
+		}
+		avg_vel /= nPoin_x;
+		avg_utau /= nPoin_x;
+		avg_nu /= nPoin_x;
+
+		for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
+			time[iPoin] = x_at_wall[iPoin][kPoin] / avg_vel;
+			wm_plus_for_fft[iPoin] = Wm_plus[iPoin][kPoin];
+		}
+
+		// Interpolate each Wm+ and T+ on n equally-spaced points, where n is an integer power of 2. //
+		min_t = time[0];
+		max_t = time[0];
+		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+			if(time[iPoin] > max_t){ max_t = time[iPoin];} // If current element is greater than max
+			if(time[iPoin] < min_t){ min_t = time[iPoin];} // If current element is smaller than min
+		}
+
+
+		h = (max_t - min_t) / (fft_npoin - 1); //spacing;
+
+		for (iPoin=0, val = min_t; iPoin < fft_npoin; iPoin++, val += h) {
+			tmp_time[iPoin] = val;
+			tmp_wmplus[iPoin] = LinearInterp(time, nPoin_x, wm_plus_for_fft, tmp_time[iPoin]);
+		}
+
+//		//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
+//		ofstream myfile_fft;
+//		/*--- Uncomment if need to debug ---*/
+//		if (rank == MASTER_NODE && kPoin == 13){
+//			myfile_fft.open ("7_fft_validation/wm_plus.dat", ios::out);
+//			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
+//				myfile_fft << tmp_wmplus[iPoin]<< ", ";
+//			}
+//			myfile_fft << tmp_wmplus[fft_npoin-1] << endl;
+//			myfile_fft.close();
+//		}
+//
+//		if (rank == MASTER_NODE && kPoin == 13){
+//			myfile_fft.open ("7_fft_validation/time.dat", ios::out);
+//			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
+//				myfile_fft << tmp_time[iPoin]<< ", ";
+//			}
+//			myfile_fft << tmp_time[fft_npoin-1] << endl;
+//			myfile_fft.close();
+//		}
+
+		//Compute the FFT of the data
+		realft(tmp_wmplus, 1.0, fft_npoin); 	// 1.0: indicates we want to map from the time to the frequency domain;
+
+//		if (rank == MASTER_NODE && kPoin == 5){
+//			myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
+//			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
+//				myfile_fft << tmp_wmplus[iPoin]<< ", ";
+//			}
+//			myfile_fft << tmp_wmplus[fft_npoin-1] << endl;
+//			myfile_fft.close();
+//		}
+
+		freq_spacing = 1.0/( h * (fft_npoin-1) );
+		for (iPoin=0, freq=0; iPoin < fft_npoin/2; iPoin++, freq += freq_spacing) {
+			fft_freq[iPoin][kPoin] = freq;
+			if (iPoin == 0){
+				fft_period[iPoin][kPoin] = 0;
+			}
+			else{
+				fft_period[iPoin][kPoin] = 1.0 / fft_freq[iPoin][kPoin];
+				fft_period[iPoin][kPoin] *= (avg_utau*avg_utau) / avg_nu; 		 // Normalize period;
+			}
+			fft_wmplus[iPoin][kPoin] = sqrt(tmp_wmplus[2*iPoin]*tmp_wmplus[2*iPoin] +
+					                   tmp_wmplus[2*iPoin+1]*tmp_wmplus[2*iPoin+1]); //compute fft magnitude: sqrt(Re(z)**2+Im(z)**2)
+			fft_wmplus[iPoin][kPoin] /= fft_npoin/2;							 // Normalize
+		}
+
+//		//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
+//		/*--- Uncomment if need to debug ---*/
+//		if (rank == MASTER_NODE && kPoin == 13){
+//			myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
+//			for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//				myfile_fft << fft_wmplus[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_wmplus[fft_npoin/2-1][kPoin] << endl;
+//			myfile_fft.close();
+//		}
+//
+//		if (rank == MASTER_NODE && kPoin == 13){
+//			myfile_fft.open ("7_fft_validation/fft_freq.dat", ios::out);
+//			for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//				myfile_fft << fft_freq[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_freq[fft_npoin/2-1][kPoin] << endl;
+//			myfile_fft.close();
+//		}
+//
+//		if (rank == MASTER_NODE && kPoin == 13){
+//			myfile_fft.open ("7_fft_validation/fft_period.dat", ios::out);
+//			for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//				myfile_fft << fft_period[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_period[fft_npoin/2-1][kPoin] << endl;
+//			myfile_fft.close();
+//		}
+
+		/*--- Compute R-factor by interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
+		/*--- R represents the % friction drag reduction compared to a flat plate ---*/
+		for (iPoin=0; iPoin < fft_npoin/2; iPoin++) {
+			// if T+, Wm+ are within the interpolating domain and is not the zero-frequency case (iPoin=0)
+			if (fft_wmplus[iPoin][kPoin] >= yy[0] &&
+				fft_wmplus[iPoin][kPoin] <= yy[config->Get_nPoiny_Ricco()-1] &&
+				fft_period[iPoin][kPoin] >= xx[0] &&
+				fft_period[iPoin][kPoin] <= xx[config->Get_nPoinx_Ricco()-1] &&
+				iPoin != 0){
+
+				xint[0] = fft_period[iPoin][kPoin];
+				xint[1] = fft_wmplus[iPoin][kPoin];
+				tmp_R[iPoin][kPoin] = BilinearInterp(xx, config->Get_nPoinx_Ricco(), yy, config->Get_nPoiny_Ricco(), zz, xint);
+				weight[iPoin][kPoin] = fft_wmplus[iPoin][kPoin];
+			}
+			else{
+				tmp_R[iPoin][kPoin] = 0;
+				weight[iPoin][kPoin] = 0;
+			}
+			sum_tmp_R += weight[iPoin][kPoin]*tmp_R[iPoin][kPoin];
+			sum_weight += weight[iPoin][kPoin];
+//			cout << "i,k = " << iPoin << ", " << kPoin << ": T+ = " << fft_period[iPoin][kPoin] << ", Wm+ = " << fft_wmplus[iPoin][kPoin]
+//				 <<	", R = " << tmp_R[iPoin][kPoin] << ", w = " <<  weight[iPoin][kPoin] << endl;
+		}
 	}
-	//END VALIDATION
+
+	/*--- Compute average of R ---*/
+	R = sum_tmp_R / sum_weight;
 
 	su2double Re_tau_flat_plate = config->Get_Stokes_Re_tau_flat_plate();
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
+
+	if (rank == MASTER_NODE){
+		cout << "R = " << R << endl;
+	}
 
 	/*--- Deallocate memory ---*/
 	for (iPoin = 0; iPoin < nPoin_x; iPoin++) {
@@ -2197,9 +2166,6 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		delete [] Wm_plus[iPoin];
 		delete [] x_at_wall[iPoin];
 		delete [] B[iPoin];
-		delete [] peaks_1[iPoin];
-		delete [] x_loc_peaks[iPoin];
-		delete [] amplitude_peaks[iPoin];
 		delete [] vel_peak[iPoin];
 		delete [] nu_peak[iPoin];
 	  }
@@ -2222,15 +2188,10 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	delete [] Wm_plus;
 	delete [] x_at_wall;
 	delete [] B;
-	delete [] peaks_1;
-	delete [] x_loc_peaks;
-	delete [] amplitude_peaks;
-	delete [] avg_amplitude;
-	delete [] avg_wavelength;
-	delete [] avg_period;
-	delete [] avg_utau;
 	delete [] vel_peak;
 	delete [] nu_peak;
+	delete [] time;
+	delete [] wm_plus_for_fft;
 
 	for (iPoin = 0; iPoin < config->Get_nPoinx_Ricco(); iPoin++) {
 		delete [] zz[iPoin];
@@ -2240,7 +2201,22 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	delete [] zz;
 	delete [] xint;
 
-	// Return viscous drag reduction
+	for (iPoin=0; iPoin < fft_npoin/2; iPoin++) {
+		delete [] fft_freq[iPoin];
+		delete [] fft_period[iPoin];
+		delete [] fft_wmplus[iPoin];
+		delete [] tmp_R[iPoin];
+		delete [] weight[iPoin];
+	}
+	delete [] fft_freq;
+	delete [] fft_period;
+	delete [] fft_wmplus;
+	delete [] tmp_time;
+	delete [] tmp_wmplus;
+	delete [] tmp_R;
+	delete [] weight;
+
+	/*---Return viscous drag reduction---*/
 	return (R / 100.0 ) * flat_plate_viscous_drag_coeff;  //viscous drag reduction w.r.t. flat plate.
 
 }
@@ -2751,7 +2727,7 @@ su2double CNSSolver::LinearInterp(su2double *xx, unsigned long nx, su2double *yy
 
 	unsigned long i;
 
-	/*--- Find the interplating bracket---*/
+	/*--- Find the interpolating bracket---*/
 	i = LinearInt_locate(xx, nx, xint);
 
 	/*--- Interpolate ---*/
@@ -2820,4 +2796,115 @@ su2double CNSSolver::ReynoldsScalingRicco(su2double R, su2double Re_tau){
 
 	return R_new;
 
+}
+
+void CNSSolver::realft(su2double *data, su2double isign, unsigned long data_size) {
+	/*---Calculates the Fourier transform of a set of n real-valued data points. Replaces these data
+	(which are stored in array data[0..n-1]) by the positive frequency half of their complex Fourier
+	transform. The real-valued first and last components of the complex transform are returned
+	as elements data[0] and data[1], respectively. n must be a power of 2. This routine also
+	calculates the inverse transform of a complex data array if it is the transform of real data.
+	(Result in this case must be multiplied by 2/n.)---*/
+
+	unsigned long i,i1,i2,i3,i4;
+	unsigned long n = data_size;
+	su2double c1=0.5,c2,h1r,h1i,h2r,h2i,wr,wi,wpr,wpi,wtemp;
+	su2double theta=3.141592653589793238/su2double(n>>1); //Initialize the recurrence.
+
+	if (isign == 1) {
+		c2 = -0.5;
+		four1(data, isign, data_size);		//The forward transform is here.
+	} else {
+		c2 = 0.5;
+		theta = -theta;		//Otherwise set up for an inverse transform.
+	}
+
+	wtemp = sin(0.5*theta);
+	wpr = -2.0*wtemp*wtemp;
+	wpi = sin(theta);
+	wr = 1.0+wpr;
+	wi = wpi;
+
+	for (i=1; i<(n>>2); i++) {			//Case i=0 done separately below
+		i2 = 1+(i1=i+i);
+		i4 = 1+(i3=n-i1);
+		h1r = c1*(data[i1]+data[i3]);	//The two separate transforms are separated out of data
+		h1i = c1*(data[i2]-data[i4]);
+		h2r = -c2*(data[i2]+data[i4]);
+		h2i = c2*(data[i1]-data[i3]);
+		data[i1] = h1r+wr*h2r-wi*h2i;	//Here they are recombined to form the true transform of the original real data
+		data[i2] = h1i+wr*h2i+wi*h2r;
+		data[i3] = h1r-wr*h2r+wi*h2i;
+		data[i4] = -h1i+wr*h2i+wi*h2r;
+		wr = (wtemp=wr)*wpr-wi*wpi+wr;
+		wi = wi*wpr+wtemp*wpi+wi;
+	}
+
+	if (isign == 1) {					//Squeeze the first and last data together to get them all within the original array.
+		data[0] = (h1r = data[0])+data[1];
+		data[1] = h1r - data[1];
+	} else {
+		data[0] = c1*((h1r = data[0])+data[1]);
+		data[1] = c1*(h1r-data[1]);
+		four1(data, isign, data_size);					//This is the inverse transform for the case isign=-1.
+	}
+
+}
+
+void CNSSolver::four1(su2double *data, su2double isign, unsigned long data_size) {
+	/*---Replaces data[0..2*n-1] by its discrete Fourier transform, if isign is input as 1; or replaces
+	data[0..2*n-1] by n times its inverse discrete Fourier transform, if isign is input as -1. data
+	is a complex array of length n stored as a real array of length 2*n. n must be an integer power	of 2.---*/
+
+	unsigned long nn,mmax,m,j,istep,i;
+	unsigned long n = data_size/2;		//Only valid for vector of real-valued data points!
+	su2double wtemp,wr,wpr,wpi,wi,theta,tempr,tempi;
+
+	if (n<2 || n&(n-1)) throw("n must be power of 2 in four1");
+
+	nn = n << 1;
+	j = 1;
+
+	for (i=1; i<nn; i+=2) {					//This is the bit-reversal section of the routine.
+		if (j > i) {
+			swap(data[j-1],data[i-1]);		//Exchange the two complex numbers.
+			swap(data[j],data[i]);
+		}
+
+		m = n;
+
+		while (m >= 2 && j > m) {
+			j -= m;
+			m >>= 1;
+		}
+		j += m;
+	}
+
+	/*---Here begins the Danielson-Lanczos section of the routine.---*/
+	mmax=2;
+
+	while (nn > mmax) {								//Outer loop executed log 2 n times.
+		istep = mmax << 1;
+		theta = isign*(6.28318530717959/mmax);		//Initialize the trigonometric recurrence.
+		wtemp = sin(0.5*theta);
+		wpr = -2.0*wtemp*wtemp;
+		wpi = sin(theta);
+		wr = 1.0;
+		wi = 0.0;
+
+		for (m=1;m<mmax;m+=2) {						//Here are the two nested inner loops.
+			for (i=m;i<=nn;i+=istep) {
+				j = i+mmax;
+				tempr = wr*data[j-1]-wi*data[j];	//This is the Danielson-Lanczos formula:
+				tempi = wr*data[j]+wi*data[j-1];
+				data[j-1] = data[i-1]-tempr;
+				data[j] = data[i]-tempi;
+				data[i-1] += tempr;
+				data[i] += tempi;
+			}
+			wr = (wtemp=wr)*wpr-wi*wpi+wr;			//Trigonometric recurrence.
+			wi=wi*wpr+wtemp*wpi+wi;
+		}
+		mmax=istep;
+	}
 }
