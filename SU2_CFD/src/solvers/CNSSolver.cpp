@@ -1805,87 +1805,97 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	/*--- Find index of closest point to inflection point where wm_plus changes sign ---*/
 	Find_change_of_sign(wm_plus, nPoin_x, nPoin_y, nPoin_z, peaks);
 
-//	//FOR VALIDATION ONLY
-//	kPoin = 0;
-//
-//	ofstream myfile1;
-//
-//
-//	/*--- Uncomment if need to debug ---*/
-//	if (rank == MASTER_NODE){
-//		myfile1.open ("1_validation_fit_exponential/peaksP.dat", ios::out);
-//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-//			myfile1 << peaks[iPoin][1][kPoin] << ", ";
-//		}
-//		myfile1 << peaks[nPoin_x-1][1][kPoin] << endl;
-//		myfile1.close();
-//	}
-//
-//	/*--- Uncomment if need to debug ---*/
-//	if (rank == MASTER_NODE){
-//		myfile1.open ("1_validation_fit_exponential/sign_changeP.dat", ios::out);
-//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-//			myfile1 << peaks[iPoin][2][kPoin] << ", " ;
-//		}
-//		myfile1 << peaks[nPoin_x-1][2][kPoin] << endl;
-//		myfile1.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile1.open ("1_validation_fit_exponential/y_plusP.dat", ios::out);
-//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-//				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
-//			}
-//			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
-//		}
-//		myfile1.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile1.open ("1_validation_fit_exponential/wm_plusP.dat", ios::out);
-//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-//				myfile1 << wm_plus[iPoin][jPoin][kPoin] << ", ";
-//			}
-//			myfile1 << wm_plus[iPoin][nPoin_y-1][kPoin] << endl;
-//		}
-//		myfile1.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile1.open ("6_tke_approx_validation/tke.dat", ios::out);
-//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-//				myfile1 << tke_approx[iPoin][jPoin][kPoin] << ", ";
-//			}
-//			myfile1 << tke_approx[iPoin][nPoin_y-1][kPoin] << endl;
-//		}
-//		myfile1.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile1.open ("6_tke_approx_validation/y_plusP.dat", ios::out);
-//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-//				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
-//			}
-//			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
-//		}
-//		myfile1.close();
-//	}
-//
-//	/*--- Uncomment if need to debug ---*/
-//	if (rank == MASTER_NODE){
-//		myfile1.open ("6_tke_approx_validation/peaks_tke.dat", ios::out);
-//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-//			myfile1 << peaks_tke[iPoin][1][kPoin] << ", " ;
-//		}
-//		myfile1 << peaks_tke[nPoin_x-1][1][kPoin] << endl;
-//		myfile1.close();
-//	}
-//
-//  //END VALIDATION
+	//FOR VALIDATION ONLY
+	kPoin = 5;
+
+	ofstream myfile1;
+
+	/*--- Uncomment if need to debug ---*/
+	if (rank == MASTER_NODE){
+		myfile1.open ("1_validation_fit_exponential/peaksP.dat", ios::out);
+		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+			myfile1 << peaks[iPoin][1][kPoin] << ", ";
+		}
+		myfile1 << peaks[nPoin_x-1][1][kPoin] << endl;
+		myfile1.close();
+	}
+
+	/*--- Uncomment if need to debug ---*/
+	if (rank == MASTER_NODE){
+		myfile1.open ("1_validation_fit_exponential/sign_changeP.dat", ios::out);
+		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+			myfile1 << peaks[iPoin][2][kPoin] << ", " ;
+		}
+		myfile1 << peaks[nPoin_x-1][2][kPoin] << endl;
+		myfile1.close();
+	}
+
+	if (rank == MASTER_NODE){
+		myfile1.open ("1_validation_fit_exponential/y_plusP.dat", ios::out);
+		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
+			}
+			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
+		}
+		myfile1.close();
+	}
+
+	if (rank == MASTER_NODE){
+		myfile1.open ("1_validation_fit_exponential/xpos.dat", ios::out);
+		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+				myfile1 << x_pos[iPoin][jPoin][kPoin] << ", ";
+			}
+			myfile1 << x_pos[iPoin][nPoin_y-1][kPoin] << endl;
+		}
+		myfile1.close();
+	}
+
+	if (rank == MASTER_NODE){
+		myfile1.open ("1_validation_fit_exponential/wm_plusP.dat", ios::out);
+		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+				myfile1 << wm_plus[iPoin][jPoin][kPoin] << ", ";
+			}
+			myfile1 << wm_plus[iPoin][nPoin_y-1][kPoin] << endl;
+		}
+		myfile1.close();
+	}
+
+	if (rank == MASTER_NODE){
+		myfile1.open ("6_tke_approx_validation/tke.dat", ios::out);
+		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+				myfile1 << tke_approx[iPoin][jPoin][kPoin] << ", ";
+			}
+			myfile1 << tke_approx[iPoin][nPoin_y-1][kPoin] << endl;
+		}
+		myfile1.close();
+	}
+
+	if (rank == MASTER_NODE){
+		myfile1.open ("6_tke_approx_validation/y_plusP.dat", ios::out);
+		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
+			}
+			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
+		}
+		myfile1.close();
+	}
+
+	/*--- Uncomment if need to debug ---*/
+	if (rank == MASTER_NODE){
+		myfile1.open ("6_tke_approx_validation/peaks_tke.dat", ios::out);
+		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+			myfile1 << peaks_tke[iPoin][1][kPoin] << ", " ;
+		}
+		myfile1 << peaks_tke[nPoin_x-1][1][kPoin] << endl;
+		myfile1.close();
+	}
+
+  //END VALIDATION
 
 	/*--- Compute equivalent spanwise oscialltion at the wall ---*/
 	Fit_exponential(wm_plus, y_plus, x_pos, nPoin_x, nPoin_y, nPoin_z, Wm_plus, x_at_wall, B, peaks);
@@ -2036,15 +2046,6 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		//Compute the FFT of the data
 		realft(tmp_wmplus, 1.0, fft_npoin); 	// 1.0: indicates we want to map from the time to the frequency domain;
 
-//		if (rank == MASTER_NODE && kPoin == 5){
-//			myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
-//			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
-//				myfile_fft << tmp_wmplus[iPoin]<< ", ";
-//			}
-//			myfile_fft << tmp_wmplus[fft_npoin-1] << endl;
-//			myfile_fft.close();
-//		}
-
 		freq_spacing = 1.0/( h * (fft_npoin-1) );
 		for (iPoin=0, freq=0; iPoin < fft_npoin/2; iPoin++, freq += freq_spacing) {
 			fft_freq[iPoin][kPoin] = freq;
@@ -2059,35 +2060,6 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 					                   tmp_wmplus[2*iPoin+1]*tmp_wmplus[2*iPoin+1]); //compute fft magnitude: sqrt(Re(z)**2+Im(z)**2)
 			fft_wmplus[iPoin][kPoin] /= fft_npoin/2;							 // Normalize
 		}
-
-//		//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
-//		/*--- Uncomment if need to debug ---*/
-//		if (rank == MASTER_NODE && kPoin == 13){
-//			myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
-//			for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-//				myfile_fft << fft_wmplus[iPoin][kPoin]<< ", ";
-//			}
-//			myfile_fft << fft_wmplus[fft_npoin/2-1][kPoin] << endl;
-//			myfile_fft.close();
-//		}
-//
-//		if (rank == MASTER_NODE && kPoin == 13){
-//			myfile_fft.open ("7_fft_validation/fft_freq.dat", ios::out);
-//			for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-//				myfile_fft << fft_freq[iPoin][kPoin]<< ", ";
-//			}
-//			myfile_fft << fft_freq[fft_npoin/2-1][kPoin] << endl;
-//			myfile_fft.close();
-//		}
-//
-//		if (rank == MASTER_NODE && kPoin == 13){
-//			myfile_fft.open ("7_fft_validation/fft_period.dat", ios::out);
-//			for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-//				myfile_fft << fft_period[iPoin][kPoin]<< ", ";
-//			}
-//			myfile_fft << fft_period[fft_npoin/2-1][kPoin] << endl;
-//			myfile_fft.close();
-//		}
 
 		/*--- Compute R-factor by interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
 		/*--- R represents the % friction drag reduction compared to a flat plate ---*/
@@ -2121,11 +2093,52 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	su2double Re_tau_flat_plate = config->Get_Stokes_Re_tau_flat_plate();
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
+	if (rank == MASTER_NODE){
+		cout << "R1 = " << R << endl;
+	}
+
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
 
 	if (rank == MASTER_NODE){
-		cout << "R = " << R << endl;
+		cout << "R2 = " << R << endl;
 	}
+
+//	//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
+//	/*--- Uncomment if need to debug ---*/
+//	ofstream myfile_fft;
+//
+//	if (rank == MASTER_NODE){
+//		myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
+//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//				myfile_fft << fft_wmplus[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_wmplus[fft_npoin/2-1][kPoin] << endl;
+//		}
+//		myfile_fft.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile_fft.open ("7_fft_validation/fft_freq.dat", ios::out);
+//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//				myfile_fft << fft_freq[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_freq[fft_npoin/2-1][kPoin] << endl;
+//		}
+//		myfile_fft.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile_fft.open ("7_fft_validation/fft_period.dat", ios::out);
+//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//				myfile_fft << fft_period[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_period[fft_npoin/2-1][kPoin] << endl;
+//		}
+//		myfile_fft.close();
+//	}
 
 	/*--- Deallocate memory ---*/
 	for (iPoin = 0; iPoin < nPoin_x; iPoin++) {
@@ -2308,15 +2321,9 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 	su2double ss, sx=0., sy=0., st2=0., t, sxoss;
 	su2double a, b;
 	su2double siga, sigb, chi2, q, sigdat;
-	su2double *x, *y, *xx, *yy;
-	unsigned long npoints_same_sign, max_idx, sig_change_idx, konst, npoint;
+	su2double *xx, *yy;
+	unsigned long  max_idx;
 	su2double count;
-
-	konst = 1; //HARDCODED
-	npoint = 7; //HARDCODED
-
-	x = new su2double[npoint];
-	y = new su2double[npoint];
 
 	xx = new su2double[2];
 	yy = new su2double[2];
@@ -2327,210 +2334,57 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 			// Store x-coord at (closest mesh point to) the wall (jPoin=0 -> farthest from the wall; jPoin=nPoin_y-1 -> closest to the wall).
 			x_at_wall[iPoin][kPoin] = x_pos[iPoin][nPoin_y-1][kPoin];
 
-			//number of points with the same wm_plus sign as the inflection point:
-			max_idx = peaks[iPoin][1][kPoin] + konst;
-			sig_change_idx = peaks[iPoin][2][kPoin];
-			npoints_same_sign = max_idx - sig_change_idx -1;
+			//jPoin index of the inflection point:
+			max_idx = peaks[iPoin][1][kPoin];
 
-//			if (kPoin == 14){
-//				cout << "rank: "<< rank << ", k,i = " << kPoin << ", " << iPoin << ", max_idx = " << max_idx << ", sig_change_idx = " << sig_change_idx << ", npoints_same_sign = " << npoints_same_sign << endl;
-//			}
+			/*--- Start with fitting ---*/
+			sx=0.0; sy=0.0; st2=0.0;
+			b=0.0;
 
-//			 if (npoints_same_sign >= npoint){ //linear fitting of an exponential
-//
-//				/*--- Start with fitting ---*/
-//				sx=0.0; sy=0.0; st2=0.0;
-//				b=0.0;
-//
-//				/*--- Transform wm+ = Wm*exp(B*y+) into a linear form log(wm+) = log(Wm+) + B*y+;
-//				 * i.e. y = a + bx, where y = log(wm+), a = log(Wm+), b = B, x = y+ ---*/
-//				for (jPoin=0; jPoin<npoint; jPoin++) {
-//					x[jPoin] = y_plus[iPoin][max_idx-npoint+jPoin][kPoin];
-//					y[jPoin] = log(abs(wm_plus[iPoin][max_idx-npoint+jPoin][kPoin]));
-//				}
-//
-//				/*--- Accumulate sums without weights. ---*/
-//				for (jPoin=0; jPoin<npoint; jPoin++) {
-//					sx += x[jPoin];
-//					sy += y[jPoin];
-//				}
-//				ss = npoint;
-//				sxoss = sx/ss;
-//
-//				for (jPoin=0; jPoin<npoint; jPoin++) {
-//					t = x[jPoin]-sxoss;
-//					st2 += t*t;
-//					b += t*y[jPoin];
-//				}
-//
-//				/*--- Solve for a, b ---*/
-//				b /= st2;
-//				a = (sy-sx*b)/ss;
-//
-//				/*---Compute Wm+ and B ---*/
-//				if (peaks[iPoin][0][kPoin] == 1){ 	//if +ve wm_plus at inflection point
-//					Wm_plus[iPoin][kPoin] = exp(a); // This is wm_plus evaluated at the wall
-//					B[iPoin][kPoin] = b;
-//				}
-//				else{								//if -ve wm_plus at inflection point
-//					Wm_plus[iPoin][kPoin] = -1.0 * exp(a); // This is wm_plus evaluated at the wall
-//					B[iPoin][kPoin] = b;
-//				}
-//
-//			 }
-//
-//			 else { // linear fitting of a line
+			//if max_idx is close to top of domain, then wm+ is a straight line -> take value close to wall
+			//to avoid (max_idx-konst-3) being -ve (Segmentation fault). --> MOVE IT TO FINDPEAKS()
+			if (max_idx < 3){max_idx = nPoin_y-1;}
 
-				/*--- Start with fitting ---*/
-				sx=0.0; sy=0.0; st2=0.0;
-				b=0.0;
+			// fit a line between inflection point and point immediately above it
+			xx[0] = y_plus[iPoin][max_idx-3][kPoin];
+			xx[1] = y_plus[iPoin][max_idx][kPoin];
 
-				//if max_idx is close to top of domain, then wm+ is a straight line -> take value close to wall
-				//to avoid (max_idx-konst-3) being -ve (Segmentation fault). --> MOVE IT TO FINDPEAKS()
-				if (max_idx < 3+konst){max_idx = nPoin_y-1;}
+			yy[0] = wm_plus[iPoin][max_idx-3][kPoin];
+			yy[1] = wm_plus[iPoin][max_idx][kPoin];
 
-				// fit a line between inflection point and point immediately above it
-				xx[0] = y_plus[iPoin][max_idx-konst-3][kPoin];
-				xx[1] = y_plus[iPoin][max_idx-konst-1][kPoin];
+			/*--- Accumulate sums without weights. ---*/
+			count = 0;
+			for (jPoin=0; jPoin<2; jPoin++) {
+				sx += xx[jPoin];
+				sy += yy[jPoin];
+				count++;
+			}
+			ss = count;
+			sxoss = sx/ss;
 
-				yy[0] = wm_plus[iPoin][max_idx-konst-3][kPoin];
-				yy[1] = wm_plus[iPoin][max_idx-konst-1][kPoin];
+			for (jPoin=0; jPoin<2; jPoin++) {
+				t = xx[jPoin]-sxoss;
+				st2 += t*t;
+				b += t*yy[jPoin];
+			}
 
-				/*--- Accumulate sums without weights. ---*/
-				count = 0;
-				for (jPoin=0; jPoin<2; jPoin++) {
-					sx += xx[jPoin];
-					sy += yy[jPoin];
-					count++;
-				}
-				ss = count;
-				sxoss = sx/ss;
+			/*--- Solve for a, b ---*/
+			b /= st2;
+			a = (sy-sx*b)/ss;
 
-				for (jPoin=0; jPoin<2; jPoin++) {
-					t = xx[jPoin]-sxoss;
-					st2 += t*t;
-					b += t*yy[jPoin];
-				}
+			/*---Compute Wm+ and B ---*/
+			Wm_plus[iPoin][kPoin] = a; // This is wm_plus evaluated at the wall
+			B[iPoin][kPoin] = b;
 
-				/*--- Solve for a, b ---*/
-				b /= st2;
-				a = (sy-sx*b)/ss;
-
-				/*---Compute Wm+ and B ---*/
-				Wm_plus[iPoin][kPoin] = a; // This is wm_plus evaluated at the wall
-				B[iPoin][kPoin] = b;
-
-//			 }
 		}
 	}
 
 	/*--- Deallocate memory ---*/
-	delete [] x;
-	delete [] y;
 	delete [] xx;
 	delete [] yy;
 
 }
 
-
-void CNSSolver::Find_peaks_and_throughs(su2double **data, 						/* input data */
-										   su2double **x_at_wall,
-		                                   unsigned long nPoin_x,				/* row count of data */
-										   unsigned long nPoin_z,
-										   su2double delta,						/* delta used for distinguishing peaks */
-										   su2double **peaks,
-										   su2double **x_loc_peaks,
-										   su2double **amplitude_peaks){					/* binary file for peaks will be put here */
-
-	/*--- Main code from: https://github.com/xuphys/peakdetect/blob/master/peakdetect.c ---*/
-
-    unsigned long iPoin, kPoin;
-    su2double  mx, mn;
-    unsigned long mx_pos;
-    unsigned long mn_pos;
-    unsigned short is_detecting_pk; // start detecting local peaks
-    su2double Wm_max;
-
-    /*--- Loop over all slices ---*/
-    for (kPoin=0; kPoin < nPoin_z; kPoin++){
-
-		/*--- Initialize max and min of the input data ---*/
-		mx = data[0][kPoin];
-		mn = data[0][kPoin];
-		is_detecting_pk = 1; // start detecting local peaks
-		mx_pos = 0;
-		mn_pos = 0;
-
-		/*--- initialize peak matrix to zero ---*/
-		Wm_max = abs(data[0][kPoin]);
-		for(iPoin = 1; iPoin < nPoin_x; ++iPoin){
-			peaks[iPoin][kPoin] = 0;
-			x_loc_peaks[iPoin][kPoin] = 0;
-			amplitude_peaks[iPoin][kPoin] = 0;
-			Wm_max = max(abs(data[iPoin][kPoin]), Wm_max);
-		}
-
-		/*--- Loop over the input data ---*/
-		for(iPoin = 1; iPoin < nPoin_x; ++iPoin){
-
-			if(data[iPoin][kPoin] > mx){
-				mx_pos = iPoin;
-				mx = data[iPoin][kPoin];
-			}
-
-			if(data[iPoin][kPoin] < mn){
-				mn_pos = iPoin;
-				mn = data[iPoin][kPoin];
-			}
-
-			if(is_detecting_pk && data[iPoin][kPoin] < mx - delta*Wm_max){
-
-				peaks[mx_pos][kPoin] = 1;
-				x_loc_peaks[mx_pos][kPoin] = x_at_wall[mx_pos][kPoin];
-				amplitude_peaks[mx_pos][kPoin] = data[mx_pos][kPoin];
-
-				is_detecting_pk = 0;
-				iPoin = mx_pos - 1;
-
-				mn = data[mx_pos][kPoin];
-				mn_pos = mx_pos;
-			}
-			else if((!is_detecting_pk) &&  data[iPoin][kPoin] > mn + delta*Wm_max){
-
-				peaks[mn_pos][kPoin] = -1;
-				x_loc_peaks[mn_pos][kPoin] = x_at_wall[mn_pos][kPoin];
-				amplitude_peaks[mn_pos][kPoin] = data[mn_pos][kPoin];
-
-				is_detecting_pk = 1;
-				iPoin = mn_pos - 1;
-
-				mx = data[mn_pos][kPoin];
-				mx_pos = mn_pos;
-			}
-		}
-    }
-
-//	/*--- Uncomment if need to debug ---*/
-//	if (rank == MASTER_NODE){
-//		for (iPoin = 0; iPoin<nPoin_x; iPoin++)
-//			cout << peaks[iPoin][5] << ", " ;
-//		cout << endl;
-//
-//		for (iPoin = 0; iPoin<nPoin_x; iPoin++)
-//			cout << x_loc_peaks[iPoin][5] << ", " ;
-//		cout << endl;
-//
-//		for (iPoin = 0; iPoin<nPoin_x; iPoin++)
-//			cout << data[iPoin][5] << ", " ;
-//		cout << endl;
-//
-//		for (iPoin = 0; iPoin<nPoin_x; iPoin++)
-//			cout << amplitude_peaks[iPoin][5] << ", " ;
-//		cout << endl;
-//
-//	}
-
-}
 
 void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data */
 		                                   unsigned long nPoin_x,				/* row count of data */
@@ -2551,14 +2405,14 @@ void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data 
     for (kPoin=0; kPoin < nPoin_z; kPoin++){
     	for (iPoin=0; iPoin < nPoin_x; iPoin++){
 
-			/*--- Initialize max and min of the input data ---*/
+			/*--- Initialize max and min of the input data. Note y coords are sorted in descending order so that jPoin = 0 corresponds to y = max(y). ---*/
 			mx = data[iPoin][0][kPoin];
 			mn = data[iPoin][0][kPoin];
 			is_detecting_pk = 1; // start detecting local peaks
 			mx_pos = 0;
 			mn_pos = 0;
 
-			/*--- Loop over the input data ---*/
+			/*--- Loop over the input data, skipping jPoin = 0 =, i.e. where y = max(y)---*/
 			for(jPoin = 1; jPoin < nPoin_y; ++jPoin){
 
 				if(data[iPoin][jPoin][kPoin] > mx){
@@ -2599,13 +2453,6 @@ void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data 
 			}
     	}
     }
-
-//	/*--- Uncomment if need to debug ---*/
-//	if (rank == MASTER_NODE){
-//		for (iPoin = 0; iPoin<nPoin_x; iPoin++)
-//				cout << peaks[iPoin][1][5] << ", " ;
-//	}
-//	cout << endl;
 
 }
 

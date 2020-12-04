@@ -564,15 +564,6 @@ public:
 					   su2double **B,
 					   unsigned long ***peaks);
 
-  void Find_peaks_and_throughs(su2double **data,
-		  	  	  	  	  	  	  su2double **x_at_wall,
-  		                          unsigned long nPoin_x,
-								  unsigned long nPoin_z,
-  								  su2double delta,
-  								  su2double **peaks,
-								  su2double **x_loc_peaks,
-								  su2double **amplitude_peaks);
-
   void Find_peak_closest_to_wall(su2double ***data,
   		                                   unsigned long nPoin_x,
   										   unsigned long nPoin_y,
