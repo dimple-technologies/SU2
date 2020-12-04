@@ -1805,97 +1805,97 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	/*--- Find index of closest point to inflection point where wm_plus changes sign ---*/
 	Find_change_of_sign(wm_plus, nPoin_x, nPoin_y, nPoin_z, peaks);
 
-	//FOR VALIDATION ONLY
-	kPoin = 5;
-
-	ofstream myfile1;
-
-	/*--- Uncomment if need to debug ---*/
-	if (rank == MASTER_NODE){
-		myfile1.open ("1_validation_fit_exponential/peaksP.dat", ios::out);
-		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-			myfile1 << peaks[iPoin][1][kPoin] << ", ";
-		}
-		myfile1 << peaks[nPoin_x-1][1][kPoin] << endl;
-		myfile1.close();
-	}
-
-	/*--- Uncomment if need to debug ---*/
-	if (rank == MASTER_NODE){
-		myfile1.open ("1_validation_fit_exponential/sign_changeP.dat", ios::out);
-		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-			myfile1 << peaks[iPoin][2][kPoin] << ", " ;
-		}
-		myfile1 << peaks[nPoin_x-1][2][kPoin] << endl;
-		myfile1.close();
-	}
-
-	if (rank == MASTER_NODE){
-		myfile1.open ("1_validation_fit_exponential/y_plusP.dat", ios::out);
-		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
-			}
-			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
-		}
-		myfile1.close();
-	}
-
-	if (rank == MASTER_NODE){
-		myfile1.open ("1_validation_fit_exponential/xpos.dat", ios::out);
-		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-				myfile1 << x_pos[iPoin][jPoin][kPoin] << ", ";
-			}
-			myfile1 << x_pos[iPoin][nPoin_y-1][kPoin] << endl;
-		}
-		myfile1.close();
-	}
-
-	if (rank == MASTER_NODE){
-		myfile1.open ("1_validation_fit_exponential/wm_plusP.dat", ios::out);
-		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-				myfile1 << wm_plus[iPoin][jPoin][kPoin] << ", ";
-			}
-			myfile1 << wm_plus[iPoin][nPoin_y-1][kPoin] << endl;
-		}
-		myfile1.close();
-	}
-
-	if (rank == MASTER_NODE){
-		myfile1.open ("6_tke_approx_validation/tke.dat", ios::out);
-		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-				myfile1 << tke_approx[iPoin][jPoin][kPoin] << ", ";
-			}
-			myfile1 << tke_approx[iPoin][nPoin_y-1][kPoin] << endl;
-		}
-		myfile1.close();
-	}
-
-	if (rank == MASTER_NODE){
-		myfile1.open ("6_tke_approx_validation/y_plusP.dat", ios::out);
-		for (iPoin=0; iPoin < nPoin_x; iPoin++){
-			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
-				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
-			}
-			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
-		}
-		myfile1.close();
-	}
-
-	/*--- Uncomment if need to debug ---*/
-	if (rank == MASTER_NODE){
-		myfile1.open ("6_tke_approx_validation/peaks_tke.dat", ios::out);
-		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
-			myfile1 << peaks_tke[iPoin][1][kPoin] << ", " ;
-		}
-		myfile1 << peaks_tke[nPoin_x-1][1][kPoin] << endl;
-		myfile1.close();
-	}
-
-  //END VALIDATION
+//	//FOR VALIDATION ONLY
+//	kPoin = 14;
+//
+//	ofstream myfile1;
+//
+//	/*--- Uncomment if need to debug ---*/
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("1_validation_fit_exponential/peaksP.dat", ios::out);
+//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+//			myfile1 << peaks[iPoin][1][kPoin] << ", ";
+//		}
+//		myfile1 << peaks[nPoin_x-1][1][kPoin] << endl;
+//		myfile1.close();
+//	}
+//
+//	/*--- Uncomment if need to debug ---*/
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("1_validation_fit_exponential/sign_changeP.dat", ios::out);
+//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+//			myfile1 << peaks[iPoin][2][kPoin] << ", " ;
+//		}
+//		myfile1 << peaks[nPoin_x-1][2][kPoin] << endl;
+//		myfile1.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("1_validation_fit_exponential/y_plusP.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
+//			}
+//			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
+//		}
+//		myfile1.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("1_validation_fit_exponential/xpos.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << x_pos[iPoin][jPoin][kPoin] << ", ";
+//			}
+//			myfile1 << x_pos[iPoin][nPoin_y-1][kPoin] << endl;
+//		}
+//		myfile1.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("1_validation_fit_exponential/wm_plusP.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << wm_plus[iPoin][jPoin][kPoin] << ", ";
+//			}
+//			myfile1 << wm_plus[iPoin][nPoin_y-1][kPoin] << endl;
+//		}
+//		myfile1.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("6_tke_approx_validation/tke.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << tke_approx[iPoin][jPoin][kPoin] << ", ";
+//			}
+//			myfile1 << tke_approx[iPoin][nPoin_y-1][kPoin] << endl;
+//		}
+//		myfile1.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("6_tke_approx_validation/y_plusP.dat", ios::out);
+//		for (iPoin=0; iPoin < nPoin_x; iPoin++){
+//			for (jPoin=0; jPoin < nPoin_y-1; jPoin++){
+//				myfile1 << y_plus[iPoin][jPoin][kPoin] << ", ";
+//			}
+//			myfile1 << y_plus[iPoin][nPoin_y-1][kPoin] << endl;
+//		}
+//		myfile1.close();
+//	}
+//
+//	/*--- Uncomment if need to debug ---*/
+//	if (rank == MASTER_NODE){
+//		myfile1.open ("6_tke_approx_validation/peaks_tke.dat", ios::out);
+//		for (iPoin = 0; iPoin<nPoin_x-1; iPoin++){
+//			myfile1 << peaks_tke[iPoin][1][kPoin] << ", " ;
+//		}
+//		myfile1 << peaks_tke[nPoin_x-1][1][kPoin] << endl;
+//		myfile1.close();
+//	}
+//
+//  //END VALIDATION
 
 	/*--- Compute equivalent spanwise oscialltion at the wall ---*/
 	Fit_exponential(wm_plus, y_plus, x_pos, nPoin_x, nPoin_y, nPoin_z, Wm_plus, x_at_wall, B, peaks);
@@ -1924,7 +1924,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
-	/*--- Retrieve streamwise velocity and laminar viscosity in correspondence of peaks ---*/
+	/*--- Retrieve streamwise velocity and laminar viscosity in correspondence of tke peaks ---*/
 	for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
 		for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
 			jPoin = peaks_tke[iPoin][1][kPoin];
@@ -1988,6 +1988,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	}
 
 
+	/*--- Loop over each spanwise slice to compute FFT of the equivalent wall oscillations ---*/
 	for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
 
 		avg_vel=0; avg_utau=0; avg_nu=0;
@@ -2022,10 +2023,10 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			tmp_wmplus[iPoin] = LinearInterp(time, nPoin_x, wm_plus_for_fft, tmp_time[iPoin]);
 		}
 
-//		//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
+//		//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation
 //		ofstream myfile_fft;
 //		/*--- Uncomment if need to debug ---*/
-//		if (rank == MASTER_NODE && kPoin == 13){
+//		if (rank == MASTER_NODE && kPoin == 14){
 //			myfile_fft.open ("7_fft_validation/wm_plus.dat", ios::out);
 //			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
 //				myfile_fft << tmp_wmplus[iPoin]<< ", ";
@@ -2034,7 +2035,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //			myfile_fft.close();
 //		}
 //
-//		if (rank == MASTER_NODE && kPoin == 13){
+//		if (rank == MASTER_NODE && kPoin == 14){
 //			myfile_fft.open ("7_fft_validation/time.dat", ios::out);
 //			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
 //				myfile_fft << tmp_time[iPoin]<< ", ";
@@ -2094,51 +2095,48 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
 	if (rank == MASTER_NODE){
-		cout << "R1 = " << R << endl;
+		cout << "R = " << R << endl;
 	}
 
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
 
+
+	//FOR VALIDATION ONLY: For each slice, plot the FFT of the equivalent wall oscillation
+	/*--- Uncomment if need to debug ---*/
+	ofstream myfile_fft;
+
 	if (rank == MASTER_NODE){
-		cout << "R2 = " << R << endl;
+		myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
+		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+				myfile_fft << fft_wmplus[iPoin][kPoin]<< ", ";
+			}
+			myfile_fft << fft_wmplus[fft_npoin/2-1][kPoin] << endl;
+		}
+		myfile_fft.close();
 	}
 
-//	//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation and the location of peaks/throughs. Visually check they make sense.
-//	/*--- Uncomment if need to debug ---*/
-//	ofstream myfile_fft;
-//
-//	if (rank == MASTER_NODE){
-//		myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
-//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//				myfile_fft << fft_wmplus[iPoin][kPoin]<< ", ";
-//			}
-//			myfile_fft << fft_wmplus[fft_npoin/2-1][kPoin] << endl;
-//		}
-//		myfile_fft.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile_fft.open ("7_fft_validation/fft_freq.dat", ios::out);
-//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//				myfile_fft << fft_freq[iPoin][kPoin]<< ", ";
-//			}
-//			myfile_fft << fft_freq[fft_npoin/2-1][kPoin] << endl;
-//		}
-//		myfile_fft.close();
-//	}
-//
-//	if (rank == MASTER_NODE){
-//		myfile_fft.open ("7_fft_validation/fft_period.dat", ios::out);
-//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-//				myfile_fft << fft_period[iPoin][kPoin]<< ", ";
-//			}
-//			myfile_fft << fft_period[fft_npoin/2-1][kPoin] << endl;
-//		}
-//		myfile_fft.close();
-//	}
+	if (rank == MASTER_NODE){
+		myfile_fft.open ("7_fft_validation/fft_freq.dat", ios::out);
+		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+				myfile_fft << fft_freq[iPoin][kPoin]<< ", ";
+			}
+			myfile_fft << fft_freq[fft_npoin/2-1][kPoin] << endl;
+		}
+		myfile_fft.close();
+	}
+
+	if (rank == MASTER_NODE){
+		myfile_fft.open ("7_fft_validation/fft_period.dat", ios::out);
+		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+				myfile_fft << fft_period[iPoin][kPoin]<< ", ";
+			}
+			myfile_fft << fft_period[fft_npoin/2-1][kPoin] << endl;
+		}
+		myfile_fft.close();
+	}
 
 	/*--- Deallocate memory ---*/
 	for (iPoin = 0; iPoin < nPoin_x; iPoin++) {
@@ -2341,10 +2339,6 @@ void CNSSolver::Fit_exponential(su2double ***wm_plus, su2double ***y_plus, su2do
 			sx=0.0; sy=0.0; st2=0.0;
 			b=0.0;
 
-			//if max_idx is close to top of domain, then wm+ is a straight line -> take value close to wall
-			//to avoid (max_idx-konst-3) being -ve (Segmentation fault). --> MOVE IT TO FINDPEAKS()
-			if (max_idx < 3){max_idx = nPoin_y-1;}
-
 			// fit a line between inflection point and point immediately above it
 			xx[0] = y_plus[iPoin][max_idx-3][kPoin];
 			xx[1] = y_plus[iPoin][max_idx][kPoin];
@@ -2443,13 +2437,18 @@ void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data 
 				}
 			}
 
+			/*--- Store mn_pos/max_pos value ---*/
+			//if mx_pos/mn_pos is close to top of domain, then wm+ is a straight line -> take value close to wall
+			//to avoid (max_idx-3) being -ve in Fit_exponential -> (Segmentation fault).
 			if (mn_pos > mx_pos){
 				peaks[iPoin][0][kPoin] = 1;
-				peaks[iPoin][1][kPoin] = mx_pos;
+				if (mx_pos < 3){ peaks[iPoin][1][kPoin] = nPoin_y-1; }
+				else { peaks[iPoin][1][kPoin] = mx_pos; }
 			}
 			else{
 				peaks[iPoin][0][kPoin] = 0;
-				peaks[iPoin][1][kPoin] = mn_pos;
+				if (mn_pos < 3){ peaks[iPoin][1][kPoin] = nPoin_y-1; }
+				else {peaks[iPoin][1][kPoin] = mn_pos;}
 			}
     	}
     }
