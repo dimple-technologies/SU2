@@ -823,8 +823,8 @@ void CNSSolver::Friction_Forces(CGeometry *geometry, CConfig *config) {
 	delta_cd = Compute_ViscCD_StokesMethod(geometry, config); // The TOTAL viscous Cd reduction is computed by every processor (no need to sum them up).
 	if (config->GetnMarker_Monitoring() == 1){// Currently works only if there is only 1 marker that is monitored
       iMarker_Monitoring = 0;
-	  SurfaceCoeff.CD[iMarker_Monitoring] = delta_cd;
-	  TotalCoeff.CD = delta_cd; //add/subtract drag increase/reduction from viscous drag coefficient
+	  SurfaceCoeff.CD[iMarker_Monitoring] += delta_cd;
+	  TotalCoeff.CD += delta_cd; //add/subtract drag increase/reduction from viscous drag coefficient
 	}
   }
 
