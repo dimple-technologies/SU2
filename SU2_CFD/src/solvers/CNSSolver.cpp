@@ -1797,16 +1797,16 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	}
 
 	/*--- Find tke inflection point closest to wall ---*/
-	Find_peak_closest_to_wall(tke_approx, nPoin_x, nPoin_y, nPoin_z, 1e-4, peaks_tke);
+	Find_peak_closest_to_wall(tke_approx, nPoin_x, nPoin_y, nPoin_z, 1e-6, peaks_tke);
 
 	/*--- Find inflection point closest to wall ---*/
-	Find_peak_closest_to_wall(wm_plus, nPoin_x, nPoin_y, nPoin_z, 1e-4, peaks);
+	Find_peak_closest_to_wall(wm_plus, nPoin_x, nPoin_y, nPoin_z, 1e-6, peaks);
 
 	/*--- Find index of closest point to inflection point where wm_plus changes sign ---*/
 	Find_change_of_sign(wm_plus, nPoin_x, nPoin_y, nPoin_z, peaks);
 
 //	//FOR VALIDATION ONLY
-//	kPoin = 14;
+//	kPoin = 15;
 //
 //	ofstream myfile1;
 //
@@ -1906,7 +1906,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //		cout << "(" << iPoin << "): Aint = " << Wm_plus[iPoin][kPoin] << " , Bint = " << B[iPoin][kPoin] << endl;;
 //	}
 //	cout << endl;
-//  //END VALIDATION
+//	//END VALIDATION
 
 	/*--- Compute Fourier transform of Wm+ for each slice ---*/
 
@@ -2024,9 +2024,12 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 
 //		//FOR VALIDATION ONLY: For each slice, plot the equivalent wall oscillation
+//
 //		ofstream myfile_fft;
+//
 //		/*--- Uncomment if need to debug ---*/
-//		if (rank == MASTER_NODE && kPoin == 14){
+//		unsigned long kkk = 68;
+//		if (rank == MASTER_NODE && kPoin == kkk){
 //			myfile_fft.open ("7_fft_validation/wm_plus.dat", ios::out);
 //			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
 //				myfile_fft << tmp_wmplus[iPoin]<< ", ";
@@ -2035,7 +2038,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //			myfile_fft.close();
 //		}
 //
-//		if (rank == MASTER_NODE && kPoin == 14){
+//		if (rank == MASTER_NODE && kPoin == kkk){
 //			myfile_fft.open ("7_fft_validation/time.dat", ios::out);
 //			for (iPoin = 0; iPoin<fft_npoin-1; iPoin++){
 //				myfile_fft << tmp_time[iPoin]<< ", ";
@@ -2043,6 +2046,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //			myfile_fft << tmp_time[fft_npoin-1] << endl;
 //			myfile_fft.close();
 //		}
+//		//END VALIDATION
 
 		//Compute the FFT of the data
 		realft(tmp_wmplus, 1.0, fft_npoin); 	// 1.0: indicates we want to map from the time to the frequency domain;
@@ -2055,11 +2059,11 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 			}
 			else{
 				fft_period[iPoin][kPoin] = 1.0 / fft_freq[iPoin][kPoin];
-				fft_period[iPoin][kPoin] *= (avg_utau*avg_utau) / avg_nu; 		 // Normalize period;
+				fft_period[iPoin][kPoin] *= (avg_utau*avg_utau) / avg_nu; 		 	// Normalize period;
 			}
 			fft_wmplus[iPoin][kPoin] = sqrt(tmp_wmplus[2*iPoin]*tmp_wmplus[2*iPoin] +
 					                   tmp_wmplus[2*iPoin+1]*tmp_wmplus[2*iPoin+1]); //compute fft magnitude: sqrt(Re(z)**2+Im(z)**2)
-			fft_wmplus[iPoin][kPoin] /= fft_npoin/2;							 // Normalize
+			fft_wmplus[iPoin][kPoin] /= fft_npoin/2;							 	 // Normalize
 		}
 
 		/*--- Compute R-factor by interpolating from Gatti and Quadrio (2016) diagram (Wm+ vs. T+ vs. R) ---*/
@@ -2101,42 +2105,43 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
 
 
-	//FOR VALIDATION ONLY: For each slice, plot the FFT of the equivalent wall oscillation
-	/*--- Uncomment if need to debug ---*/
-	ofstream myfile_fft;
-
-	if (rank == MASTER_NODE){
-		myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
-		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-				myfile_fft << fft_wmplus[iPoin][kPoin]<< ", ";
-			}
-			myfile_fft << fft_wmplus[fft_npoin/2-1][kPoin] << endl;
-		}
-		myfile_fft.close();
-	}
-
-	if (rank == MASTER_NODE){
-		myfile_fft.open ("7_fft_validation/fft_freq.dat", ios::out);
-		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-				myfile_fft << fft_freq[iPoin][kPoin]<< ", ";
-			}
-			myfile_fft << fft_freq[fft_npoin/2-1][kPoin] << endl;
-		}
-		myfile_fft.close();
-	}
-
-	if (rank == MASTER_NODE){
-		myfile_fft.open ("7_fft_validation/fft_period.dat", ios::out);
-		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
-			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
-				myfile_fft << fft_period[iPoin][kPoin]<< ", ";
-			}
-			myfile_fft << fft_period[fft_npoin/2-1][kPoin] << endl;
-		}
-		myfile_fft.close();
-	}
+//	//FOR VALIDATION ONLY: For each slice, plot the FFT of the equivalent wall oscillation
+//	/*--- Uncomment if need to debug ---*/
+//	ofstream myfile_fft;
+//
+//	if (rank == MASTER_NODE){
+//		myfile_fft.open ("7_fft_validation/fft_wm_plus.dat", ios::out);
+//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//				myfile_fft << fft_wmplus[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_wmplus[fft_npoin/2-1][kPoin] << endl;
+//		}
+//		myfile_fft.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile_fft.open ("7_fft_validation/fft_freq.dat", ios::out);
+//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//				myfile_fft << fft_freq[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_freq[fft_npoin/2-1][kPoin] << endl;
+//		}
+//		myfile_fft.close();
+//	}
+//
+//	if (rank == MASTER_NODE){
+//		myfile_fft.open ("7_fft_validation/fft_period.dat", ios::out);
+//		for (iPoin = 0; iPoin<fft_npoin/2-1; iPoin++){
+//			for (kPoin = 0; kPoin<nPoin_z; kPoin++){
+//				myfile_fft << fft_period[iPoin][kPoin]<< ", ";
+//			}
+//			myfile_fft << fft_period[fft_npoin/2-1][kPoin] << endl;
+//		}
+//		myfile_fft.close();
+//	}
+//	//END VALIDATION
 
 	/*--- Deallocate memory ---*/
 	for (iPoin = 0; iPoin < nPoin_x; iPoin++) {
@@ -2391,8 +2396,8 @@ void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data 
 
     unsigned long iPoin, jPoin, kPoin;
     su2double  mx, mn;
-    unsigned long mx_pos;
-    unsigned long mn_pos;
+    unsigned long mx_pos, mn_pos;
+    unsigned long mx_loc, mn_loc;
     unsigned short is_detecting_pk; // start detecting local peaks
 
     /*--- Loop over all slices ---*/
@@ -2403,8 +2408,8 @@ void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data 
 			mx = data[iPoin][0][kPoin];
 			mn = data[iPoin][0][kPoin];
 			is_detecting_pk = 1; // start detecting local peaks
-			mx_pos = 0;
-			mn_pos = 0;
+			mx_pos = 0; mn_pos = 0;
+			mx_loc = 0; mn_loc = 0;
 
 			/*--- Loop over the input data, skipping jPoin = 0 =, i.e. where y = max(y)---*/
 			for(jPoin = 1; jPoin < nPoin_y; ++jPoin){
@@ -2425,7 +2430,7 @@ void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data 
 					jPoin = mx_pos - 1;
 
 					mn = data[iPoin][mx_pos][kPoin];
-					mn_pos = mx_pos;
+					mn_loc = mx_pos;
 				}
 				else if((!is_detecting_pk) &&  data[iPoin][jPoin][kPoin] > mn + delta){
 
@@ -2433,22 +2438,23 @@ void CNSSolver::Find_peak_closest_to_wall(su2double ***data, 					/* input data 
 					jPoin = mn_pos - 1;
 
 					mx = data[iPoin][mn_pos][kPoin];
-					mx_pos = mn_pos;
+					mx_loc = mn_pos;
 				}
 			}
 
 			/*--- Store mn_pos/max_pos value ---*/
 			//if mx_pos/mn_pos is close to top of domain, then wm+ is a straight line -> take value close to wall
 			//to avoid (max_idx-3) being -ve in Fit_exponential -> (Segmentation fault).
-			if (mn_pos > mx_pos){
+
+			if (mx_loc > mn_loc){ //i.e. if mx_loc is closer to wall than mn_loc (since y coords are sorted in descending order)
 				peaks[iPoin][0][kPoin] = 1;
-				if (mx_pos < 3){ peaks[iPoin][1][kPoin] = nPoin_y-1; }
-				else { peaks[iPoin][1][kPoin] = mx_pos; }
+				if (mx_loc < 3){ peaks[iPoin][1][kPoin] = nPoin_y-1; }
+				else { peaks[iPoin][1][kPoin] = mx_loc; }
 			}
 			else{
 				peaks[iPoin][0][kPoin] = 0;
-				if (mn_pos < 3){ peaks[iPoin][1][kPoin] = nPoin_y-1; }
-				else {peaks[iPoin][1][kPoin] = mn_pos;}
+				if (mn_loc < 3){ peaks[iPoin][1][kPoin] = nPoin_y-1; }
+				else {peaks[iPoin][1][kPoin] = mn_loc;}
 			}
     	}
     }
