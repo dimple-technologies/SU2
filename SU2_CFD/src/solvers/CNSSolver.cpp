@@ -1987,6 +1987,7 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
+	su2double u_tau_mean = 0;
 
 	/*--- Loop over each spanwise slice to compute FFT of the equivalent wall oscillations ---*/
 	for (kPoin = 0; kPoin < nPoin_z; ++kPoin){
@@ -2001,6 +2002,8 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		avg_vel /= nPoin_x;
 		avg_utau /= nPoin_x;
 		avg_nu /= nPoin_x;
+
+		u_tau_mean += avg_utau;
 
 		for (iPoin = 0; iPoin < nPoin_x; ++iPoin){
 			time[iPoin] = x_at_wall[iPoin][kPoin] / avg_vel;
@@ -2092,17 +2095,24 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 		}
 	}
 
+	u_tau_mean /= nPoin_z;
+//	cout << "u_tau_mean = " << u_tau_mean << endl; //Uncomment only if u_tau_mean is needed to specify Re_tau flat plate
+
 	/*--- Compute average of R ---*/
 	R = sum_tmp_R / sum_weight;
 
 	su2double Re_tau_flat_plate = config->Get_Stokes_Re_tau_flat_plate();
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
 
-	if (rank == MASTER_NODE){
-		cout << "R = " << R << endl;
+	if (rank == MASTER_NODE && config->GetInnerIter() % config->GetScreen_Wrt_Freq(2) == 0){
+		cout << config->GetInnerIter() << " R = " << R << endl;
 	}
 
 	R = ReynoldsScalingRicco(R, Re_tau_flat_plate); // result is in percentage (%)
+
+//	if (rank == MASTER_NODE){
+//		cout << "R2 = " << R << endl;
+//	}
 
 
 //	//FOR VALIDATION ONLY: For each slice, plot the FFT of the equivalent wall oscillation
