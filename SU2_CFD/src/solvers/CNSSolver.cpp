@@ -2099,7 +2099,12 @@ su2double CNSSolver::Compute_ViscCD_StokesMethod(CGeometry *geometry, CConfig *c
 //	cout << "u_tau_mean = " << u_tau_mean << endl; //Uncomment only if u_tau_mean is needed to specify Re_tau flat plate
 
 	/*--- Compute average of R ---*/
-	R = sum_tmp_R / sum_weight;
+	if (sum_weight == 0){
+		R = sum_tmp_R / (sum_weight + 1e-15); //add small number
+	}
+	else {
+		R = sum_tmp_R / sum_weight;
+	}
 
 	su2double Re_tau_flat_plate = config->Get_Stokes_Re_tau_flat_plate();
 	su2double flat_plate_viscous_drag_coeff = config->Get_Stokes_flat_plate_viscous_drag_coeff();
