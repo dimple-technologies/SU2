@@ -352,7 +352,9 @@ void CDiscAdjSinglezoneDriver::SetObjFunction(){
 
     solver[FLOW_SOL]->Evaluate_ObjFunc(config);
     ObjFunc += solver[FLOW_SOL]->GetTotal_ComboObj();
-    cout << "adj_cd = " << ObjFunc << endl;
+
+//    cout << "adj_cd = " << ObjFunc << endl;
+
     if (heat){
       if (config->GetKind_ObjFunc() == TOTAL_HEATFLUX) {
         ObjFunc += solver[HEAT_SOL]->GetTotal_HeatFlux();
